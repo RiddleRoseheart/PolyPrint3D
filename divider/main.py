@@ -211,3 +211,8 @@ def get_target_tool0_temperature(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get target tool0 temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get target tool0 temperature from OctoPrint server.")
+
+import uvicorn
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info")
