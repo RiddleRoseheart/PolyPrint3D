@@ -1,17 +1,29 @@
 import axios from 'axios';
 import { API_BASE_URL } from './config';
 
+const handleError = (error) => {
+  if (error.response) {
+    throw new Error(error.response.data.error || 'Server error');
+  }
+  throw error;
+};
+
 export const fetchTestData = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/data`);
     return response.data;
   } catch (error) {
-    throw error;
+    handleError(error);
   }
 };
 
 export const uploadSTLFile = async (formData) => {
   try {
+    // Debug log
+    for (let pair of formData.entries()) {
+      console.log('FormData content:', pair[0], pair[1]);
+    }
+    
     const response = await axios.post(`${API_BASE_URL}/api/files/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -19,11 +31,10 @@ export const uploadSTLFile = async (formData) => {
     });
     return response.data;
   } catch (error) {
-    throw error;
+    handleError(error);
   }
 };
-
-export const sliceSTLFile = async (fileId, slicingSettings) => {
+export const sliceSTLFile = async (fileId, slicingSettings = {}) => {
   try {
     const response = await axios.post(`${API_BASE_URL}/api/slicer/slice`, {
       fileId,
@@ -31,7 +42,7 @@ export const sliceSTLFile = async (fileId, slicingSettings) => {
     });
     return response.data;
   } catch (error) {
-    throw error;
+    handleError(error);
   }
 };
 
@@ -40,7 +51,7 @@ export const checkSlicingStatus = async (slicingId) => {
     const response = await axios.get(`${API_BASE_URL}/api/slicer/status/${slicingId}`);
     return response.data;
   } catch (error) {
-    throw error;
+    handleError(error);
   }
 };
 
@@ -49,10 +60,15 @@ export const startPrint = async (printRequest) => {
     const response = await axios.post(`${API_BASE_URL}/api/printer/send`, printRequest);
     return response.data;
   } catch (error) {
-    throw error;
+    handleError(error);
   }
 };
+
 export const checkPrintStatus = async (printJobId) => {
-  const response = await axios.get(`${API_BASE_URL}/api/printer/status/${printJobId}`);
-  return response.data;
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/printer/status/${printJobId}`);
+    return response.data;
+  } catch (error) {
+    handleError(error);
+  }
 };

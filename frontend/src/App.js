@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchTestData } from './api/endpoints';
 import PrintSettings from './components/PrintSettings';
-import { Box } from '@mui/material';
+import { Box, Alert, Container } from '@mui/material';
 import STLFileUpload from './components/STLFileUpload';
 import SlicedFilesPreview from './components/SlicedFilesPreview';
 import PrintingProgress from './components/PrintProgress';
@@ -27,51 +27,78 @@ function App() {
         loadData();
     }, []);
 
-    if (error) return <div>Error: {error}</div>;
+    const handleFileUploaded = (fileData) => {
+        setError(null);
+        setUploadedFile(fileData);
+    };
+
+    const handleSlicingComplete = (result) => {
+        setError(null);
+        setSlicingResult(result);
+    };
 
     const handlePrintStart = (printData) => {
-        console.log('Starting print with data:', printData);
+        setError(null);
         setPrintStarted(printData);
     };
 
-    return (
-        <div className="App">
-            <header className="App-header">
-                <h1>{data ? data : "Loading..."}</h1>
-            </header>
-            <main style={{ padding: "20px" }}>
-            </main>
-            
-           <Box sx={{ width: '100%', p: 2 }}>
-            <Box sx={{ mb: 2 }}>
-                {data ? data : "Loading..."}
-            </Box>
-            
-            {!uploadedFile ? (
-                <STLFileUpload onFileUploaded={setUploadedFile} />
-            ) : !slicingResult ? (
-                <PrintSettings 
-                    fileData={uploadedFile} 
-                    onSlicingComplete={setSlicingResult}
-                />
-            ) : !printStarted ? (
-                <SlicedFilesPreview 
-                    slicingResult={slicingResult}
-                    onPrintStart={handlePrintStart}  // Make sure this prop is passed
-                />
-            ) : (
-                <PrintingProgress 
-                    selectedFiles={printStarted}
-                    onReset={() => {
-                        setUploadedFile(null);
-                        setSlicingResult(null);
-                        setPrintStarted(null);
-                    }}
-                />
-            )}
-        </Box>
+    const handleReset = () => {
+        setUploadedFile(null);
+        setSlicingResult(null);
+        setPrintStarted(null);
+        setError(null);
+    };
 
-        </div>
+    const handleError = (errorMessage) => {
+        setError(errorMessage);
+    };
+
+    return (
+        <Container maxWidth="lg">
+            <Box sx={{ py: 4 }}>
+                <Box sx={{ mb: 4, textAlign: 'center' }}>
+                    <h1>3D Print Workflow</h1>
+                    {data && (
+                        <Box sx={{ mb: 2 }}>
+                            {data}
+                        </Box>
+                    )}
+                </Box>
+
+                {error && (
+                    <Alert 
+                        severity="error" 
+                        sx={{ mb: 3 }}
+                        onClose={() => setError(null)}
+                    >
+                        {error}
+                    </Alert>
+                )}
+
+                
+<Box sx={{ width: '100%', p: 2 }}>
+                {!uploadedFile ? (
+                    <STLFileUpload onFileUploaded={handleFileUploaded} />
+                ) : !slicingResult ? (
+                    <PrintSettings
+                        fileData={uploadedFile}  // Now contains both file and fileId
+                        onSlicingComplete={setSlicingResult}
+                    />
+                ) : !printStarted ? (
+                    <SlicedFilesPreview
+                        slicingResult={slicingResult}
+                        onPrintStart={handlePrintStart}
+                    />
+                ) : (
+                        <PrintingProgress
+                            selectedFiles={printStarted}
+                            onReset={handleReset}
+                            onError={handleError}
+                        />
+                    )}
+                </Box>
+            </Box>
+        </Container>
     );
 }
 

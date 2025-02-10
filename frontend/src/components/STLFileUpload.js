@@ -7,10 +7,12 @@ import {
   Paper,
   Alert
 } from '@mui/material';
+import { uploadSTLFile } from '../api/endpoints'; 
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { LoadingButton } from '@mui/lab';
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; //placeholder 
+
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB limit 
 
 const STLFileUpload = ({ onFileUploaded }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -47,51 +49,42 @@ const STLFileUpload = ({ onFileUploaded }) => {
   };
 
   const handleUpload = async () => {
-    setIsLoading(true); 
+    setIsLoading(true);
+    setError('');
+    
     if (!selectedFile) {
       setError('Please select a file first');
+      setIsLoading(false);
       return;
     }
 
-    const formData = new FormData();
-    formData.append('stlFile', selectedFile);
-
     try {
-      /*const response = await fetch('/api/files/upload', {
-        method: 'POST',
-        body: formData,
-        onUploadProgress: (progressEvent) => {
-          const progress = (progressEvent.loaded / progressEvent.total) * 100;
-          setUploadProgress(progress);
-        },
-      });
+      const formData = new FormData();
+      formData.append('file', selectedFile);
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const data = await response.json();
-      console.log('Upload successful:', data);
-       */
-
-    // Simulation //TODO replace with actual API call (comemnted out above)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log('Upload successful (mocked):', {
-      id: 'mock123',
-      fileName: selectedFile.name,
-      uploadedAt: new Date().toISOString()
-    });
-
-
+      const response = await uploadSTLFile(formData);
+      
       setUploadProgress(0);
       setSelectedFile(null);
-      onFileUploaded(selectedFile);
+      
+      onFileUploaded({
+        file: selectedFile,
+        fileId: response.fileId,
+        filename: response.filename,
+        status: response.status
+      });
 
     } catch (err) {
-      setError('Failed to upload file: ' + err.message);
+      setError(err.message || 'Failed to upload file');
+      console.error('Upload error:', err);
     } finally {
-      setIsLoading(false); 
+      setIsLoading(false);
     }
+};
+  const cancelUpload = () => {
+    setSelectedFile(null);
+    setUploadProgress(0);
+    setError('');
   };
 
   return (
@@ -101,6 +94,7 @@ const STLFileUpload = ({ onFileUploaded }) => {
           accept=".stl"
           style={{ display: 'none' }}
           id="stl-file-upload"
+          name="file" 
           type="file"
           onChange={handleFileSelect}
         />
@@ -117,9 +111,14 @@ const STLFileUpload = ({ onFileUploaded }) => {
         </label>
 
         {selectedFile && (
-          <Typography variant="body1" sx={{ mt: 2 }}>
-            Selected file: {selectedFile.name}
-          </Typography>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body1">
+              Selected file: {selectedFile.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+            </Typography>
+          </Box>
         )}
 
         {error && (
@@ -139,18 +138,29 @@ const STLFileUpload = ({ onFileUploaded }) => {
             </Typography>
           </Box>
         )}
-{selectedFile && !error && (
-          <LoadingButton
-            loading={isLoading}
-            loadingPosition="start"
-            startIcon={<CloudUploadIcon />}
-            variant="contained"
-            color="primary"
-            onClick={handleUpload}
-            sx={{ mt: 2 }}
-          >
-            {isLoading ? 'Processing...' : 'Upload File'}
-          </LoadingButton>
+
+        {selectedFile && !error && (
+          <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <LoadingButton
+              loading={isLoading}
+              loadingPosition="start"
+              startIcon={<CloudUploadIcon />}
+              variant="contained"
+              color="primary"
+              onClick={handleUpload}
+            >
+              {isLoading ? 'Uploading...' : 'Upload File'}
+            </LoadingButton>
+            
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={cancelUpload}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+          </Box>
         )}
       </Box>
     </Paper>

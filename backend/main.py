@@ -4,7 +4,13 @@ from backend.routes import api
 
 def create_app():
     app = Flask(__name__)
-    CORS(app)
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE"],
+            "allow_headers": ["Content-Type"]
+        }
+    })
     app.register_blueprint(api.bp)
 
     @app.route('/')
