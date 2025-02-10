@@ -108,3 +108,25 @@ def get_target_temperature_tool0(ip: str, api_key: str) -> float:
     temperature: json = _get_current_temperature(ip=ip, api_key=api_key)
     tool0_temperature = temperature['tool0']
     return tool0_temperature['target']
+def get_version(ip: str, api_key: str) -> json:
+    """
+    Retrieves connection information from the OctoPrint server version + state.
+
+    :param ip: The IP address of the OctoPrint server.
+    :param api_key:  The API key for authentication.
+    :return: json: The current version + state of octoprint.
+    """
+    octoprint_url: str = f"http://{ip}/api"
+    url = f"{octoprint_url}/server"
+    headers = {
+        'X-Api-Key': api_key,
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.get(url=url, headers=headers)
+
+    if response.status_code == 200:
+        # logger.info(f"Response: {response.text}")
+        return response.json()
+    else:
+        logger.error(f"Failed to retrieve connection info: {response.status_code} - {response.text}")

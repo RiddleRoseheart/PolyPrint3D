@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from logging_config import logger
 from octoprint_connector import *
 from octoprint_info_retriever import *
-
+from octoprint_jobs import *
 app = FastAPI(
     debug=True,  # production this need to be false
     title="Poly_Print_Api_Gateway",
@@ -211,6 +211,27 @@ def get_target_tool0_temperature(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get target tool0 temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get target tool0 temperature from OctoPrint server.")
+
+@app.get("/job/status")
+def job_status(ip: str, api_key: str):
+    """
+    Retrieves the status of the current job from the OctoPrint server.
+
+    - **ip**: The IP address of the OctoPrint server.
+    - **api_key**: The API key for authentication.
+
+    Returns the status of the current job.
+
+    Raises:
+        HTTPException: If the IP is not an OctoPrint server or if the job status retrieval fails.
+    """
+    if not is_octoprint_server(ip, api_key):
+        raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
+    try:
+        job_status = get_status_job(ip, api_key)
+        return job_status
+    except Exception as e:
+        logger.error(f"Failed to get job status: {e}")
 
 import uvicorn
 

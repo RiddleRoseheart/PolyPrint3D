@@ -1,63 +1,74 @@
+@baseUrl = http://127.0.0.1:8000
+#@ip = 10.0.0.254
+@ip = 10.2.168.3
+#@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+@apiKey = uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo
 # Test the root endpoint
-GET http://127.0.0.1:8000/
+GET {{baseUrl}}/
 Accept: application/json
 
 ###
 
 # Test the connect endpoint
-GET http://127.0.0.1:8000/connect?ip=10.0.0.254&api_key=hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+GET {{baseUrl}}/connect?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
 ###
 
 # Test the disconnect endpoint
-GET http://127.0.0.1:8000/disconnect?ip=10.0.0.254&api_key=hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+GET {{baseUrl}}/disconnect?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
 ###
 
 # Test the connection info endpoint
-GET http://127.0.0.1:8000/connection?ip=10.0.0.254&api_key=hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+GET {{baseUrl}}/connection?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
 ###
 
 # Test the flags endpoint
-GET http://127.0.0.1:8000/flags?ip=10.0.0.254&api_key=hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+GET {{baseUrl}}/flags?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
 ###
 
 # Test the bed temperature endpoint
-GET http://127.0.0.1:8000/temperature/bed?ip=10.0.0.254&api_key=hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+GET {{baseUrl}}/temperature/bed?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
 ###
 
 # Test the tool0 temperature endpoint
-GET http://127.0.0.1:8000/temperature/tool0?ip=10.0.0.254&api_key=hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+GET {{baseUrl}}/temperature/tool0?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
 ###
 
 # Test the target bed temperature endpoint
-GET http://127.0.0.1:8000/temperature/bed/target?ip=10.0.0.254&api_key=hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+GET {{baseUrl}}/temperature/bed/target?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
 ###
 
 # Test the target tool0 temperature endpoint
-GET http://127.0.0.1:8000/temperature/tool0/target?ip=10.0.0.254&api_key=hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+GET {{baseUrl}}/temperature/tool0/target?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
 ###
 
-POST http://127.0.0.1:8000/api/printer/command
+# Test the job status endpoint
+GET {{baseUrl}}/job/status?ip={{ip}}&api_key={{apiKey}}
+Accept: application/json
+
+###
+
+POST {{baseUrl}}/api/printer/command
 Content-Type: application/json
 Accept: application/json
 
 {
-  "ip": "10.0.0.254",
-  "api_key": "hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI",
+  "ip": "{{ip}}",
+  "api_key": "{{apiKey}}",
   "command": "M114"
 }
