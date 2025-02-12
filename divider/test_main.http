@@ -63,6 +63,24 @@ Accept: application/json
 
 ###
 
+# Test the job status endpoint
+GET {{baseUrl}}/files?ip={{ip}}&api_key={{apiKey}}
+Accept: application/json
+
+###
+# Test the job status endpoint
+# Test the job cancel endpoint
+POST {{baseUrl}}/job/cancel
+Content-Type: application/json
+Accept: application/json
+
+{
+  "ip": "{{ip}}",
+  "api_key": "{{apiKey}}"
+}
+
+###
+
 POST {{baseUrl}}/api/printer/command
 Content-Type: application/json
 Accept: application/json
