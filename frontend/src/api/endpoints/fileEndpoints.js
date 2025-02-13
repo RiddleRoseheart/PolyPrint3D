@@ -1,5 +1,3 @@
-// fileEndpoints.js
-
 import axiosInstance from '../axiosConfig';
 import { handleError } from '../../utils/errorHandler';
 
