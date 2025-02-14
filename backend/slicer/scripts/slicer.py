@@ -3,6 +3,19 @@ import os
 import subprocess
 from pathlib import Path
 import numpy as np
+import sys
+
+# Add slicer directory to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+slicer_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(slicer_dir)
+
+from scripts.remote_storage import RemoteStorage
+try:
+    from config.remote_settings import SFTP_CONFIG
+except ImportError:
+    print("Please create remote_settings.py from remote_config.py")
+    raise
 
 # Printer's Build Volume
 BUILD_VOLUME = (250, 210, 210)  # (X, Y, Z)
@@ -133,22 +146,36 @@ def split_and_distribute_objects(input_path, output_dir, printer_count, build_vo
     # Process each group
     Path(output_dir).mkdir(exist_ok=True)
     output_files = []
+
+    # Connect to remote storage
+    remote_storage = RemoteStorage(SFTP_CONFIG)
+    remote_storage.connect()
     
-    for i, group in enumerate(object_groups):
-        if group:
-            print(f"Arranging group {i+1}...")
-            arranged_scene, unplaced = arrange_objects_in_print_area(
-                group, build_volume, padding=padding
-            )
-            
-            if arranged_scene.geometry:
-                file_name = os.path.join(output_dir, f"group_{i+1}.stl")
-                arranged_scene.export(file_name)
-                output_files.append(file_name)
-                print(f"Exported {file_name}")
-            
-            if unplaced:
-                print(f"Warning: {len(unplaced)} objects in group {i+1} could not be placed.")
+    try:
+        for i, group in enumerate(object_groups):
+            if group:
+                print(f"Arranging group {i+1}...")
+                arranged_scene, unplaced = arrange_objects_in_print_area(
+                    group, build_volume, padding=padding
+                )
+                
+                if arranged_scene.geometry:
+                    # Save locally first 
+                    local_file = os.path.join(output_dir, f"group_{i+1}.stl")
+                    arranged_scene.export(local_file)
+                    print(f"Exported {local_file}")
+
+                    # Then upload to remote
+                    remote_path = f"{SFTP_CONFIG['remote_base_path']}/split_objects/group_{i+1}.stl"
+                    if remote_storage.upload_file(local_file, remote_path):
+                        output_files.append(local_file)
+                        print(f"Uploaded to {remote_path}")
+                
+                if unplaced:
+                    print(f"Warning: {len(unplaced)} objects in group {i+1} could not be placed.")
+
+    finally:
+        remote_storage.disconnect()
     
     return output_files
 
@@ -167,8 +194,20 @@ def slice_with_prusa_slicer(stl_path, output_dir, config_path):
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         print(f"Successfully sliced {stl_path}")
-        if result.stderr:
-            print("Slicer messages:", result.stderr)
+        # if result.stderr:
+        #     print("Slicer messages:", result.stderr)
+        # After successful slice, upload the G-code
+        gcode_file = os.path.join(output_dir, Path(stl_path).stem + ".gcode")
+        if os.path.exists(gcode_file):
+            remote_storage = RemoteStorage(SFTP_CONFIG)
+            remote_storage.connect()
+            try:
+                remote_path = f"{SFTP_CONFIG['remote_base_path']}/gcode/{Path(stl_path).stem}.gcode"
+                if remote_storage.upload_file(gcode_file, remote_path):
+                    print(f"Uploaded G-code to {remote_path}")
+            finally:
+                remote_storage.disconnect()
+                
     except subprocess.CalledProcessError as e:
         print(f"Error slicing {stl_path}: {e}")
     except FileNotFoundError:
