@@ -171,3 +171,5 @@ cython_debug/
 .pypirc
 
 divider/test.gcode
+
+divider/test.py

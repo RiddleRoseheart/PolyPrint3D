@@ -80,6 +80,10 @@ Accept: application/json
 }
 
 ###
+# Test the upload endpoint
+POST {{baseUrl}}/upload?
+
+###
 
 POST {{baseUrl}}/api/printer/command
 Content-Type: application/json
