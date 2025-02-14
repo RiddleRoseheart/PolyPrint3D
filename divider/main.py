@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Form, UploadFile, File
 from fastapi.responses import JSONResponse
 from logging_config import logger
 from octoprint_connector import *
@@ -234,30 +234,6 @@ def job_status(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get job status: {e}")
 
-@app.post("/job/cancel")
-# def cancel_job(ip: str, api_key: str):
-#     """
-#     Cancels the current print job on the OctoPrint server.
-#
-#     - **ip**: The IP address of the OctoPrint server.
-#     - **api_key**: The API key for authentication.
-#
-#     Returns a success message if the job was successfully canceled.
-#
-#     Raises:
-#         HTTPException: If the IP is not an OctoPrint server or if the job cancellation fails.
-#     """
-#     if not is_octoprint_server(ip, api_key):
-#         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
-#     try:
-#         if cancel_print_job(ip, api_key):
-#             return {"message": "Print job successfully canceled."}
-#         else:
-#             raise HTTPException(status_code=500, detail="Failed to cancel print job.")
-#     except Exception as e:
-#         logger.error(f"Failed to cancel print job: {e}")
-#         raise HTTPException(status_code=500, detail="Failed to cancel print job.")
-
 @app.get("/files")
 def cancel_job(ip: str, api_key: str):
 
@@ -269,8 +245,13 @@ def cancel_job(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get job status: {e}")
 
+@app.post("/upload")
+def upload_file(ip: str, api_key: str, path: str):
+    upload_gcode_file(ip=ip, api_key=api_key, path=path)
+
 
 import uvicorn
 
 if __name__ == "__main__":
+    # upload_gcode_file("10.2.168.3", "uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo", "C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\test.gcode")
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info")
