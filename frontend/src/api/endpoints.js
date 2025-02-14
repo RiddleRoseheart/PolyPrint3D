@@ -34,14 +34,19 @@ export const uploadSTLFile = async (formData) => {
     handleError(error);
   }
 };
-export const sliceSTLFile = async (fileId, slicingSettings = {}) => {
+
+export const sliceSTLFile = async (slicingSettings) => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/api/slicer/slice`, {
-      fileId,
-      settings: slicingSettings
+    console.log('Sending slicing request to backend:', {
+      url: `${API_BASE_URL}/api/slicer/slice`,
+      data: slicingSettings
     });
+    
+    const response = await axios.post(`${API_BASE_URL}/api/slicer/slice`, slicingSettings);
+    console.log('Backend response:', response.data);
     return response.data;
   } catch (error) {
+    console.error('Slicing error response:', error.response || error);
     handleError(error);
   }
 };
