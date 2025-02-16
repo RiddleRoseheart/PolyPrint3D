@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// onyl simulation of print progress // todo 
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Box, 
     Paper, 
@@ -9,169 +10,126 @@ import {
     LinearProgress,
     Stack,
     Alert,
-    IconButton
+    Button,
+    Tooltip
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import { LoadingButton } from '@mui/lab';
+import PauseCircleIcon from '@mui/icons-material/PauseCircle';
+import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 
-const PrintingProgress = ({ selectedFiles, printerAssignments }) => {
+const PRINT_SPEED = 1000; // 1 second per percent
+const DISPLAY_NOTIFICATIONS = 5; // Number of notifications to show
+
+const PrintingProgress = ({ selectedFiles, onReset }) => {
     const [printJobs, setPrintJobs] = useState([]);
-    const [error, setError] = useState('');
     const [notifications, setNotifications] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
 
-//TODO add preview again or merge with previous
-
-
-    // Mock //TODO should come from backend
-    const [printerStatuses, setPrinterStatuses] = useState({
-        'Printer 1': { status: 'PRINTING', progress: 0 },
-        'Printer 2': { status: 'PRINTING', progress: 0 },
-        'Printer 3': { status: 'PRINTING', progress: 0 },
-    });
-
-    useEffect(() => {
-        initializePrintJobs();
-        startProgressSimulation();
-        return () => clearAllIntervals();
-    }, []);
-
-    const initializePrintJobs = () => {
-        // Mock initialization
+    // Initialize print jobs with settings
+    const initializePrintJobs = useCallback(() => {
         const jobs = selectedFiles.map((file, index) => ({
-            id: `job_${index}`,
-            fileName: file.name,
+            id: `print_${Date.now()}_${Math.random()}`,
+            fileName: file.name || `Print_${index + 1}.stl`,
             printer: `Printer ${(index % 3) + 1}`,
-            status: 'QUEUED',
+            status: 'PRINTING',
             progress: 0,
+            isPaused: false,
+            estimatedTime: 30 + (Math.random() * 30),
+            timeRemaining: 30,
+            startTime: new Date(),
             printVariables: {
-                material: file.material,
-                quality: file.quality,
-                infill: file.infill
+                material: file.material || 'PLA',
+                quality: file.quality || '0.2mm',
+                infill: file.infill || '20%',
+                temperature: '200°C',
+                bedTemp: '60°C'
             }
         }));
+
         setPrintJobs(jobs);
-        setIsLoading(false);
+    }, [selectedFiles]);
 
-        /* //TODO API implementation
-        const initializePrints = async () => {
-            try {
-                const response = await axios.post(`${API_BASE_URL}/api/printer/batch`, {
-                    files: selectedFiles,
-                    printerAssignments
-                });
-                
-                setPrintJobs(response.data.jobs);
-                startPrinterMonitoring(response.data.jobs);
-            } catch (error) {
-                setError('Failed to initialize print jobs: ' + error.message);
-            } finally {
-                setIsLoading(false);
+    // Update progress for active prints
+    const updateJobProgress = useCallback(() => {
+        setPrintJobs(prev => prev.map(job => {
+            if (job.status === 'COMPLETED' || job.isPaused) return job;
+
+            const newProgress = Math.min(job.progress + 1, 100);
+            const newStatus = newProgress === 100 ? 'COMPLETED' : 'PRINTING';
+            const newTimeRemaining = Math.max(
+                0, 
+                job.estimatedTime * (100 - newProgress) / 100
+            );
+
+            if (newProgress === 100) {
+                addNotification(`Print completed: ${job.fileName}`);
             }
-        };
-        initializePrints();
-        */
-    };
 
-    const startProgressSimulation = () => {
-        // Mock 
-        const intervals = printJobs.map(job => {
-            return setInterval(() => {
-                setPrintJobs(prev => prev.map(j => {
-                    if (j.id === job.id) {
-                        const newProgress = Math.min(j.progress + 1, 100);
-                        const newStatus = newProgress === 100 ? 'COMPLETED' : 'PRINTING';
-                        
-                        if (newProgress === 100) {
-                            addNotification(`Print completed: ${j.fileName}`);
-                        }
-                        
-                        return { ...j, progress: newProgress, status: newStatus };
-                    }
-                    return j;
-                }));
-            }, 1000);
-        });
+            return { 
+                ...job, 
+                progress: newProgress, 
+                status: newStatus,
+                timeRemaining: newTimeRemaining
+            };
+        }));
+    }, []);
 
-        return () => intervals.forEach(clearInterval);
-    };
+    // Initialize jobs on component mount
+    useEffect(() => {
+        initializePrintJobs();
+    }, [initializePrintJobs]);
 
-    /* //TODO API implementation
-    const startPrinterMonitoring = (jobs) => {
-        const monitorInterval = setInterval(async () => {
-            try {
-                const statuses = await Promise.all(
-                    jobs.map(job => 
-                        axios.get(`${API_BASE_URL}/api/printer/status/${job.id}`)
-                    )
-                );
-                
-                const updatedJobs = jobs.map((job, index) => ({
+    // Progress update interval
+    useEffect(() => {
+        const interval = setInterval(updateJobProgress, PRINT_SPEED);
+        return () => clearInterval(interval);
+    }, [updateJobProgress]);
+
+    // Handle individual print pause/resume
+    const togglePauseJob = (jobId) => {
+        setPrintJobs(prev => prev.map(job => {
+            if (job.id === jobId) {
+                const newIsPaused = !job.isPaused;
+                addNotification(`${job.fileName} ${newIsPaused ? 'paused' : 'resumed'}`);
+                return {
                     ...job,
-                    ...statuses[index].data
-                }));
-                
-                setPrintJobs(updatedJobs);
-                
-                // Check for completed prints
-                updatedJobs.forEach(job => {
-                    if (job.status === 'COMPLETED') {
-                        addNotification(`Print completed: ${job.fileName}`);
-                    }
-                });
-                
-                // Stop monitoring if all jobs are done
-                if (updatedJobs.every(job => 
-                    ['COMPLETED', 'FAILED'].includes(job.status)
-                )) {
-                    clearInterval(monitorInterval);
-                }
-            } catch (error) {
-                setError('Error monitoring print jobs: ' + error.message);
+                    isPaused: newIsPaused
+                };
             }
-        }, 5000);
-
-        return () => clearInterval(monitorInterval);
+            return job;
+        }));
     };
-    */
 
+    // Add notification to queue
     const addNotification = (message) => {
-        setNotifications(prev => [...prev, {
+        setNotifications(prev => [{
             id: Date.now(),
             message,
             timestamp: new Date()
-        }]);
+        }, ...prev]);
     };
 
-    const clearAllIntervals = () => {
-        const interval_id = window.setInterval(() => {}, Number.MAX_SAFE_INTEGER);
-        for (let i = 1; i < interval_id; i++) {
-            window.clearInterval(i);
-        }
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'COMPLETED': return 'success.main';
-            case 'PRINTING': return 'primary.main';
-            case 'FAILED': return 'error.main';
-            default: return 'text.secondary';
-        }
+    // Format time display
+    const formatTimeRemaining = (minutes) => {
+        if (minutes < 1) return 'Less than a minute';
+        return `${Math.round(minutes)} minutes`;
     };
 
     return (
         <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
-            <Typography variant="h4" gutterBottom>
-                Printing Progress
-            </Typography>
-
-            {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
-                </Alert>
-            )}
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                <Typography variant="h4">
+                    Printing Progress
+                </Typography>
+                <Button
+                    variant="outlined"
+                    onClick={onReset}
+                    startIcon={<RestartAltIcon />}
+                >
+                    Start Over
+                </Button>
+            </Stack>
 
             <Grid container spacing={3}>
                 {printJobs.map((job) => (
@@ -190,27 +148,46 @@ const PrintingProgress = ({ selectedFiles, printerAssignments }) => {
                                     <LinearProgress 
                                         variant="determinate" 
                                         value={job.progress} 
-                                        color={job.status === 'FAILED' ? 'error' : 'primary'}
+                                        color={job.status === 'COMPLETED' ? 'success' : 'primary'}
                                     />
                                 </Box>
 
                                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                    <Typography 
-                                        color={getStatusColor(job.status)}
-                                        sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                                    >
-                                        {job.status === 'COMPLETED' && <CheckCircleIcon />}
-                                        {job.status === 'FAILED' && <ErrorIcon />}
-                                        {job.status === 'PRINTING' && <PrintIcon />}
-                                        {job.status}
-                                    </Typography>
+                                    <Tooltip title={job.status}>
+                                        <Typography 
+                                            color={job.status === 'COMPLETED' ? 'success.main' : 'primary.main'}
+                                            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                                        >
+                                            {job.status === 'COMPLETED' ? <CheckCircleIcon /> : <PrintIcon />}
+                                            {job.status}
+                                            {job.isPaused && ' (Paused)'}
+                                        </Typography>
+                                    </Tooltip>
                                     <Typography>
                                         {job.progress}%
                                     </Typography>
                                 </Stack>
 
+                                {job.status !== 'COMPLETED' && (
+                                    <Button
+                                        fullWidth
+                                        variant="outlined"
+                                        onClick={() => togglePauseJob(job.id)}
+                                        startIcon={job.isPaused ? <PlayCircleIcon /> : <PauseCircleIcon />}
+                                        sx={{ mt: 2 }}
+                                    >
+                                        {job.isPaused ? 'Resume Print' : 'Pause Print'}
+                                    </Button>
+                                )}
+
+                                {job.status === 'PRINTING' && !job.isPaused && (
+                                    <Typography variant="body2" sx={{ mt: 1 }}>
+                                        Time remaining: {formatTimeRemaining(job.timeRemaining)}
+                                    </Typography>
+                                )}
+
                                 <Typography variant="body2" sx={{ mt: 2 }}>
-                                    Print variables:
+                                    Print settings:
                                     {Object.entries(job.printVariables).map(([key, value]) => (
                                         <Box key={key} sx={{ pl: 2 }}>
                                             {key}: {value}
@@ -229,7 +206,7 @@ const PrintingProgress = ({ selectedFiles, printerAssignments }) => {
                         Notifications
                     </Typography>
                     <Stack spacing={1}>
-                        {notifications.map(notification => (
+                        {notifications.slice(0, DISPLAY_NOTIFICATIONS).map(notification => (
                             <Alert 
                                 key={notification.id} 
                                 severity="success"
