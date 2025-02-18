@@ -1,8 +1,9 @@
 @baseUrl = http://127.0.0.1:8000
-#@ip = 10.0.0.254
-@ip = 10.2.168.3
-#@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
-@apiKey = uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo
+@ip = 10.0.0.254
+#@ip = 10.2.168.3
+@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+#@apiKey = uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo
+@path = C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode
 # Test the root endpoint
 GET {{baseUrl}}/
 Accept: application/json
@@ -63,9 +64,36 @@ Accept: application/json
 
 ###
 
-# Test the job status endpoint
+# Test the files endpoint
 GET {{baseUrl}}/files?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
+
+###
+# Test the upload endpoint
+POST {{baseUrl}}/upload?ip={{ip}}&api_key={{apiKey}}&path={{path}}
+
+###
+
+# Test the delete endpoint
+DELETE {{baseUrl}}/delete?ip={{ip}}&api_key={{apiKey}}&name=demo.gcode
+Accept: application/json
+
+
+
+
+
+
+
+###
+POST {{baseUrl}}/api/printer/command
+Content-Type: application/json
+Accept: application/json
+
+{
+  "ip": "{{ip}}",
+  "api_key": "{{apiKey}}",
+  "command": "M114"
+}
 
 ###
 # Test the job status endpoint
@@ -77,20 +105,4 @@ Accept: application/json
 {
   "ip": "{{ip}}",
   "api_key": "{{apiKey}}"
-}
-
-###
-# Test the upload endpoint
-POST {{baseUrl}}/upload?
-
-###
-
-POST {{baseUrl}}/api/printer/command
-Content-Type: application/json
-Accept: application/json
-
-{
-  "ip": "{{ip}}",
-  "api_key": "{{apiKey}}",
-  "command": "M114"
 }

@@ -245,13 +245,67 @@ def cancel_job(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get job status: {e}")
 
+
+def is_valid_path(path: str) -> bool:
+    return os.path.exists(path) and os.path.isfile(path)
+
+@app.delete("/delete")
+def delete_file_endpoint(ip: str, api_key: str, name: str):
+    """
+    Deletes a file from the OctoPrint server.
+
+    - **ip**: The IP address of the OctoPrint server.
+    - **api_key**: The API key for authentication.
+    - **name**: The name of the file to delete.
+
+    Returns a message indicating the deletion status.
+
+    Raises:
+        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the deletion fails.
+    """
+    if not is_octoprint_server(ip, api_key):
+        raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
+    if not is_octoprint_connected(ip, api_key):
+        raise HTTPException(status_code=400, detail="OctoPrint server is not connected.")
+    try:
+        result = delete_file(ip, api_key, name)
+        if result is not None:
+            return {"message": f"File {name} deleted successfully."}
+    except FileNotFoundError as e:
+        logger.error(f"Failed to delete file {name}: {e}")
+        raise HTTPException(status_code=404, detail=f"File {name} not found.")
+    except RuntimeError as e:
+        logger.error(f"Failed to delete file {name}: {e}")
+        raise HTTPException(status_code=409, detail=f"File {name} is currently being printed.")
+    except Exception as e:
+        logger.error(f"Failed to delete file {name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete file {name} from OctoPrint server.")
 @app.post("/upload")
-def upload_file(ip: str, api_key: str, path: str):
-    upload_gcode_file(ip=ip, api_key=api_key, path=path)
+def upload_file(ip: str, api_key: str, path:str)-> str | None:
+    """
+    Upload the file on to octoprint server.
 
+    - **ip**: The IP address of the OctoPrint server.
+    - **api_key**: The API key for authentication.
+    - **path**: The path of the local file for uploading.
 
+    Returns message of success of the upload.
+
+    Raises:
+        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the target tool0 temperature retrieval fails.
+    """
+    if not is_octoprint_server(ip, api_key):
+        raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
+    try:
+        if is_valid_path(path=path):
+            upload_gcode_file(ip=ip, api_key=api_key, path=path)
+            logger.info(f"file: {path} is uploaded")
+            return f"file: {path} is uploaded"
+    except Exception as e:
+        logger.error(f"failed to upload file ({path}) because: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload to upload to the OctoPrint server.")
 import uvicorn
 
 if __name__ == "__main__":
-    # upload_gcode_file("10.2.168.3", "uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo", "C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\test.gcode")
+    # upload_gcode_file("10.2.168.3", "uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo", "C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode")
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info")

@@ -62,5 +62,25 @@ def upload_gcode_file(ip: str, api_key: str, path: str):
     except FileExistsError:
         logger.warning(f"this is not a file {os.path.basename(path)}")
 
+def delete_file(ip: str, api_key: str, name: str):
+    octoprint_url: str = f"http://{ip}/api"
+    url = f"{octoprint_url}/files/local/{name}"
+    headers = {
+        'X-Api-Key': api_key,
+        'Content-Type': 'application/json'
+    }
+    try:
+        response = requests.delete(url, headers=headers)
+        if response.status_code == 204:
+            logger.info(f"File {name} deleted successfully.")
+            return response.json()
+        elif response.status_code == 404:
+            raise FileNotFoundError(f"File {name} not found.")
+        elif response.status_code == 409:
+            raise RuntimeError(f"File {name} is currently being printed.")
+    except requests.exceptions.RequestException as err:
+        logger.error(f"Failed to delete file {name}: {err}")
+        return None
+
 def log_end_upload(monitor):
     logger.info(f"Uploaded {monitor.bytes_read} of {monitor.len}")
