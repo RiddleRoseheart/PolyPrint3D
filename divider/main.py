@@ -5,19 +5,21 @@ from octoprint_connector import *
 from octoprint_info_retriever import *
 from octoprint_jobs import *
 from ocotprint_files import *
+
+# Initialize FastAPI app with metadata
 app = FastAPI(
-    debug=True,  # production this need to be false
+    debug=True,  # In production, this should be set to False
     title="Poly_Print_Api_Gateway",
-    summary="A API gateway for all the printers via OctoPrint",
+    summary="An API gateway for all the printers via OctoPrint",
     description="",
-    version="0.0.1",
+    version="0.0.9",
     default_response_class=JSONResponse,
     docs_url="/doc",
     redoc_url="/redoc",
     terms_of_service=None,
     contact={
         "name": "Support",
-            "email": "antoine.goethuys@student.ehb.be",
+        "email": "antoine.goethuys@student.ehb.be",
     },
     license_info={
         "name": "Apache 2.0",
@@ -25,19 +27,33 @@ app = FastAPI(
     }
 )
 
-@app.get("/connect")
+@app.get("/connect", responses={
+    200: {
+        "description": "Successful connection",
+        "content": {
+            "application/json": {
+                "example": {"message": "Connection started successfully."}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to connect to OctoPrint server."}
+            }
+        }
+    }
+})
 def connect(ip: str, api_key: str):
-    """
-    Connects to the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns a message indicating the connection status.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server or if the connection fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     try:
@@ -47,19 +63,33 @@ def connect(ip: str, api_key: str):
         logger.error(f"Failed to connect: {e}")
         raise HTTPException(status_code=500, detail="Failed to connect to OctoPrint server.")
 
-@app.get("/disconnect")
+@app.get("/disconnect", responses={
+    200: {
+        "description": "Successful disconnection",
+        "content": {
+            "application/json": {
+                "example": {"message": "Disconnected successfully."}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to disconnect from OctoPrint server."}
+            }
+        }
+    }
+})
 def disconnect(ip: str, api_key: str):
-    """
-    Disconnects from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns a message indicating the disconnection status.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the disconnection fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     if not is_octoprint_connected(ip, api_key):
@@ -71,19 +101,33 @@ def disconnect(ip: str, api_key: str):
         logger.error(f"Failed to disconnect: {e}")
         raise HTTPException(status_code=500, detail="Failed to disconnect from OctoPrint server.")
 
-@app.get("/connection")
+@app.get("/connection", responses={
+    200: {
+        "description": "Connection information retrieved successfully",
+        "content": {
+            "application/json": {
+                "example": {"connection_info": "example_connection_info"}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to get connection info from OctoPrint server."}
+            }
+        }
+    }
+})
 def get_connection_info(ip: str, api_key: str):
-    """
-    Retrieves connection information from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns the connection information.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server or if the connection information retrieval fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     try:
@@ -93,19 +137,33 @@ def get_connection_info(ip: str, api_key: str):
         logger.error(f"Failed to get connection info: {e}")
         raise HTTPException(status_code=500, detail="Failed to get connection info from OctoPrint server.")
 
-@app.get("/flags")
+@app.get("/flags", responses={
+    200: {
+        "description": "Flags retrieved successfully",
+        "content": {
+            "application/json": {
+                "example": {"flags": "example_flags"}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to get flags from OctoPrint server."}
+            }
+        }
+    }
+})
 def get_flags(ip: str, api_key: str):
-    """
-    Retrieves the current flags from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns the current flags of the printer.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the flags retrieval fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     if not is_octoprint_connected(ip, api_key):
@@ -117,19 +175,33 @@ def get_flags(ip: str, api_key: str):
         logger.error(f"Failed to get flags: {e}")
         raise HTTPException(status_code=500, detail="Failed to get flags from OctoPrint server.")
 
-@app.get("/temperature/bed")
+@app.get("/temperature/bed", responses={
+    200: {
+        "description": "Bed temperature retrieved successfully",
+        "content": {
+            "application/json": {
+                "example": {"bed_temperature": 60.0}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to get bed temperature from OctoPrint server."}
+            }
+        }
+    }
+})
 def get_bed_temperature(ip: str, api_key: str):
-    """
-    Retrieves the current bed temperature from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns the current bed temperature.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the bed temperature retrieval fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     if not is_octoprint_connected(ip, api_key):
@@ -141,19 +213,33 @@ def get_bed_temperature(ip: str, api_key: str):
         logger.error(f"Failed to get bed temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get bed temperature from OctoPrint server.")
 
-@app.get("/temperature/tool0")
+@app.get("/temperature/tool0", responses={
+    200: {
+        "description": "Tool0 temperature retrieved successfully",
+        "content": {
+            "application/json": {
+                "example": {"tool0_temperature": 200.0}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to get tool0 temperature from OctoPrint server."}
+            }
+        }
+    }
+})
 def get_tool0_temperature(ip: str, api_key: str):
-    """
-    Retrieves the current tool0 temperature from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns the current tool0 temperature.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the tool0 temperature retrieval fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     if not is_octoprint_connected(ip, api_key):
@@ -165,19 +251,33 @@ def get_tool0_temperature(ip: str, api_key: str):
         logger.error(f"Failed to get tool0 temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get tool0 temperature from OctoPrint server.")
 
-@app.get("/temperature/bed/target")
+@app.get("/temperature/bed/target", responses={
+    200: {
+        "description": "Target bed temperature retrieved successfully",
+        "content": {
+            "application/json": {
+                "example": {"target_bed_temperature": 60.0}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to get target bed temperature from OctoPrint server."}
+            }
+        }
+    }
+})
 def get_target_bed_temperature(ip: str, api_key: str):
-    """
-    Retrieves the target bed temperature from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns the target bed temperature.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the target bed temperature retrieval fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     if not is_octoprint_connected(ip, api_key):
@@ -189,19 +289,33 @@ def get_target_bed_temperature(ip: str, api_key: str):
         logger.error(f"Failed to get target bed temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get target bed temperature from OctoPrint server.")
 
-@app.get("/temperature/tool0/target")
+@app.get("/temperature/tool0/target", responses={
+    200: {
+        "description": "Target tool0 temperature retrieved successfully",
+        "content": {
+            "application/json": {
+                "example": {"target_tool0_temperature": 200.0}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to get target tool0 temperature from OctoPrint server."}
+            }
+        }
+    }
+})
 def get_target_tool0_temperature(ip: str, api_key: str):
-    """
-    Retrieves the target tool0 temperature from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns the target tool0 temperature.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the target tool0 temperature retrieval fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     if not is_octoprint_connected(ip, api_key):
@@ -213,19 +327,33 @@ def get_target_tool0_temperature(ip: str, api_key: str):
         logger.error(f"Failed to get target tool0 temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get target tool0 temperature from OctoPrint server.")
 
-@app.get("/job/status")
+@app.get("/job/status", responses={
+    200: {
+        "description": "Job status retrieved successfully",
+        "content": {
+            "application/json": {
+                "example": {"job_status": "example_job_status"}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to get job status from OctoPrint server."}
+            }
+        }
+    }
+})
 def job_status(ip: str, api_key: str):
-    """
-    Retrieves the status of the current job from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-
-    Returns the status of the current job.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server or if the job status retrieval fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     try:
@@ -234,9 +362,33 @@ def job_status(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get job status: {e}")
 
-@app.get("/files")
+@app.get("/files", responses={
+    200: {
+        "description": "Files retrieved successfully",
+        "content": {
+            "application/json": {
+                "example": {"files": "example_files"}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to get files from OctoPrint server."}
+            }
+        }
+    }
+})
 def cancel_job(ip: str, api_key: str):
-
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     try:
@@ -245,24 +397,49 @@ def cancel_job(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get job status: {e}")
 
-
-def is_valid_path(path: str) -> bool:
-    return os.path.exists(path) and os.path.isfile(path)
-
-@app.delete("/delete")
+@app.delete("/delete", responses={
+    200: {
+        "description": "File deleted successfully",
+        "content": {
+            "application/json": {
+                "example": {"message": "File demo.gcode deleted successfully."}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    404: {
+        "description": "File not found",
+        "content": {
+            "application/json": {
+                "example": {"detail": "File demo.gcode not found."}
+            }
+        }
+    },
+    409: {
+        "description": "Conflict",
+        "content": {
+            "application/json": {
+                "example": {"detail": "File demo.gcode is currently being printed."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to delete file demo.gcode from OctoPrint server."}
+            }
+        }
+    }
+})
 def delete_file_endpoint(ip: str, api_key: str, name: str):
-    """
-    Deletes a file from the OctoPrint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-    - **name**: The name of the file to delete.
-
-    Returns a message indicating the deletion status.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the deletion fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     if not is_octoprint_connected(ip, api_key):
@@ -280,20 +457,34 @@ def delete_file_endpoint(ip: str, api_key: str, name: str):
     except Exception as e:
         logger.error(f"Failed to delete file {name}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete file {name} from OctoPrint server.")
-@app.post("/upload")
+
+@app.post("/upload", responses={
+    200: {
+        "description": "File uploaded successfully",
+        "content": {
+            "application/json": {
+                "example": {"message": "file: C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode is uploaded"}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to upload to the OctoPrint server."}
+            }
+        }
+    }
+})
 def upload_file(ip: str, api_key: str, path:str)-> str | None:
-    """
-    Upload the file on to octoprint server.
-
-    - **ip**: The IP address of the OctoPrint server.
-    - **api_key**: The API key for authentication.
-    - **path**: The path of the local file for uploading.
-
-    Returns message of success of the upload.
-
-    Raises:
-        HTTPException: If the IP is not an OctoPrint server, if the server is not connected, or if the target tool0 temperature retrieval fails.
-    """
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     try:
@@ -303,9 +494,12 @@ def upload_file(ip: str, api_key: str, path:str)-> str | None:
             return f"file: {path} is uploaded"
     except Exception as e:
         logger.error(f"failed to upload file ({path}) because: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload to upload to the OctoPrint server.")
+        raise HTTPException(status_code=500, detail="Failed to upload to the OctoPrint server.")
+
+def is_valid_path(path: str) -> bool:
+    return os.path.exists(path) and os.path.isfile(path)
+
 import uvicorn
 
 if __name__ == "__main__":
-    # upload_gcode_file("10.2.168.3", "uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo", "C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode")
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info")

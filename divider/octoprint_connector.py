@@ -9,7 +9,6 @@ import requests
 import json
 from logging_config import logger
 
-
 def connect_octoprint(ip: str, api_key: str) -> None:
     """
     Connects to the OctoPrint server.
@@ -35,9 +34,12 @@ def connect_octoprint(ip: str, api_key: str) -> None:
         response = requests.post(url=url, headers=headers, json=data)
 
         if response.status_code == 204:
+            # Log success if the connection was started successfully
             logger.info(f"Connection started successfully on ip {ip}.")
         else:
+            # Log an error if the connection failed
             logger.error(f"Failed to start connection: {response.status_code} - {response.text}")
+
 def disconnect_octoprint(ip: str, api_key: str) -> None:
     """
     Disconnects from the OctoPrint server.
@@ -59,9 +61,12 @@ def disconnect_octoprint(ip: str, api_key: str) -> None:
         response = requests.post(url=url, headers=headers, json=data)
 
         if response.status_code == 204:
-            logger.info(f"Connection clossed successfully on ip {ip}.")
+            # Log success if the disconnection was successful
+            logger.info(f"Connection closed successfully on ip {ip}.")
         else:
-            logger.error(f"Failed to start connection: {response.status_code} - {response.text}")
+            # Log an error if the disconnection failed
+            logger.error(f"Failed to close connection: {response.status_code} - {response.text}")
+
 def get_connection(ip: str, api_key: str) -> json:
     """
     Retrieves connection information from the OctoPrint server.
@@ -82,13 +87,17 @@ def get_connection(ip: str, api_key: str) -> json:
         if response.status_code == 200:
             connection_info = response.json()
             if connection_info['current']['state'] == 'Closed':
+                # Log a warning if the connection is closed
                 logger.warning(f"Connection is closed on ip {ip}.")
             else:
+                # Log success if the connection info was retrieved successfully
                 logger.info(f"Successfully retrieved connection info from ip {ip}.")
                 logger.info(f"Response: {connection_info}")
             return connection_info
         else:
+            # Log an error if the request failed
             logger.error(f"Failed to retrieve connection info: {response.status_code} - {response.text}")
+
 def is_octoprint_server(ip: str, api_key: str) -> bool:
     """
     Checks if the given IP address is an OctoPrint server.
@@ -107,15 +116,19 @@ def is_octoprint_server(ip: str, api_key: str) -> bool:
     try:
         response = requests.get(url=url, headers=headers)
         if response.status_code == 200:
+            # Log success if the IP is an OctoPrint server
             logger.info(f"IP {ip} is an OctoPrint server.")
             return True
         elif response.status_code == 401:
+            # Log an error if the API key is incorrect
             logger.error("Not correct key.")
             return False
         else:
+            # Log a warning if the IP is not an OctoPrint server
             logger.warning(f"IP {ip} is not an OctoPrint server. Status code: {response.status_code}")
             return False
     except requests.ConnectionError as e:
+        # Log an error if there was a connection error
         logger.error(f"Failed to connect to IP {ip}: {e}")
         return False
 
@@ -131,5 +144,6 @@ def is_octoprint_connected(ip: str, api_key: str) -> bool:
         connection_info = get_connection(ip, api_key)
         return connection_info['current']['state'] == 'Operational'
     except Exception as e:
+        # Log an error if there was an issue retrieving the connection info
         logger.error(f"Failed to get connection info: {e}")
         return False
