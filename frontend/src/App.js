@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Alert, Container, Typography, Stepper, Step, StepLabel } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import PrintSettings from './components/PrintSettings';
 import STLFileUpload from './components/STLFileUpload';
 import SlicedFilesPreview from './components/SlicedFilesPreview';
 import PrintingProgress from './components/PrintProgress';
 import { CircularProgress } from '@mui/material';
+import AdminPanel from './components/AdminPanel';
 
 const STEPS = [
   'Upload STL File',
@@ -122,55 +124,62 @@ function App() {
     };
 
     return (
-        <Container maxWidth="lg">
-            <Box sx={{ py: 4 }}>
-                <Box sx={{ mb: 4, textAlign: 'center' }}>
-                    <Typography variant="h3" component="h1" gutterBottom>
-                        3D Print Workflow
-                    </Typography>
-                    {appState.data && (
-                        <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-                            {appState.data}
-                        </Typography>
-                    )}
-                </Box>
+        <Router>
+            <Routes>
+                <Route path="/admin" element={<AdminPanel />} />
+                <Route path="/" element={
+                    <Container maxWidth="lg">
+                        <Box sx={{ py: 4 }}>
+                            <Box sx={{ mb: 4, textAlign: 'center' }}>
+                                <Typography variant="h3" component="h1" gutterBottom>
+                                    3D Print Workflow
+                                </Typography>
+                                {appState.data && (
+                                    <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+                                        {appState.data}
+                                    </Typography>
+                                )}
+                            </Box>
 
-                <Stepper 
-                    activeStep={getActiveStep()} 
-                    sx={{ mb: 4 }}
-                    alternativeLabel
-                >
-                    {STEPS.map((label) => (
-                        <Step key={label}>
-                            <StepLabel>{label}</StepLabel>
-                        </Step>
-                    ))}
-                </Stepper>
+                            <Stepper 
+                                activeStep={getActiveStep()} 
+                                sx={{ mb: 4 }}
+                                alternativeLabel
+                            >
+                                {STEPS.map((label) => (
+                                    <Step key={label}>
+                                        <StepLabel>{label}</StepLabel>
+                                    </Step>
+                                ))}
+                            </Stepper>
 
-                {appState.error && (
-                    <Alert 
-                        severity="error" 
-                        sx={{ mb: 3 }}
-                        onClose={() => setAppState(prev => ({ ...prev, error: null }))}
-                    >
-                        {appState.error}
-                    </Alert>
-                )}
+                            {appState.error && (
+                                <Alert 
+                                    severity="error" 
+                                    sx={{ mb: 3 }}
+                                    onClose={() => setAppState(prev => ({ ...prev, error: null }))}
+                                >
+                                    {appState.error}
+                                </Alert>
+                            )}
 
-                <Box 
-                    sx={{ 
-                        width: '100%', 
-                        p: 2,
-                        minHeight: '60vh',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center'
-                    }}
-                >
-                    {renderCurrentStep()}
-                </Box>
-            </Box>
-        </Container>
+                            <Box 
+                                sx={{ 
+                                    width: '100%', 
+                                    p: 2,
+                                    minHeight: '60vh',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                {renderCurrentStep()}
+                            </Box>
+                        </Box>
+                    </Container>
+                } />
+            </Routes>
+        </Router>
     );
 }
 
