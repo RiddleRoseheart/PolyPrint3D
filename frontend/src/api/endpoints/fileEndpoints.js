@@ -1,3 +1,4 @@
+// src/api/endpoints/fileEndpoints.js
 import axiosInstance from '../axiosConfig';
 import { handleError } from '../../utils/errorHandler';
 
@@ -6,14 +7,13 @@ import { handleError } from '../../utils/errorHandler';
  */
 
 /**
- * Uploads an STL file to the server
+ * Upload an STL file
  * @param {FormData} formData - FormData containing the file to upload
  * @returns {Promise<Object>} Upload response data
  * @throws {Error} If upload fails
  */
 export const uploadSTLFile = async (formData) => {
     try {
-        // Log FormData contents in development environment
         if (process.env.NODE_ENV === 'development') {
             for (let pair of formData.entries()) {
                 console.log('FormData content:', pair[0], pair[1]);
@@ -25,7 +25,6 @@ export const uploadSTLFile = async (formData) => {
                 'Content-Type': 'multipart/form-data',
             },
         });
-        
         return response.data;
     } catch (error) {
         handleError(error);
@@ -33,8 +32,22 @@ export const uploadSTLFile = async (formData) => {
 };
 
 /**
- * Retrieves file metadata by ID
- * @param {string} fileId - ID of the file to retrieve
+ * Get all files for current user
+ * @returns {Promise<Object>} List of files
+ * @throws {Error} If retrieval fails
+ */
+export const getUserFiles = async () => {
+    try {
+        const response = await axiosInstance.get('/api/files');
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Get file metadata by ID
+ * @param {string} fileId - ID of the file
  * @returns {Promise<Object>} File metadata
  * @throws {Error} If retrieval fails
  */
@@ -48,23 +61,22 @@ export const getFile = async (fileId) => {
 };
 
 /**
- * Deletes a file by ID
- * @param {string} fileId - ID of the file to delete
- * @returns {Promise<Object>} Deletion response data
+ * Delete file by ID
+ * @param {string} fileId - ID of the file
+ * @returns {Promise<void>} No content on success
  * @throws {Error} If deletion fails
  */
 export const deleteFile = async (fileId) => {
     try {
-        const response = await axiosInstance.delete(`/api/files/${fileId}`);
-        return response.data;
+        await axiosInstance.delete(`/api/files/${fileId}`);
     } catch (error) {
         handleError(error);
     }
 };
 
 /**
- * Retrieves file content (binary data) by ID
- * @param {string} fileId - ID of the file content to retrieve
+ * Get file content by ID
+ * @param {string} fileId - ID of the file
  * @returns {Promise<Blob>} File content as binary data
  * @throws {Error} If content retrieval fails
  */
@@ -78,13 +90,13 @@ export const getFileContent = async (fileId) => {
         });
         return response.data;
     } catch (error) {
-        console.error('File content error:', error);
-        throw error;
+        handleError(error);
     }
 };
 
 export default {
     uploadSTLFile,
+    getUserFiles,
     getFile,
     deleteFile,
     getFileContent
