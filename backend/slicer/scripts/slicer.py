@@ -11,6 +11,8 @@ slicer_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(slicer_dir)
 
 from scripts.remote_storage import RemoteStorage
+from scripts.file_manager import FileManager
+
 try:
     from config.remote_settings import SFTP_CONFIG
 except ImportError:
@@ -106,10 +108,12 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
     
     return scene, unplaced_objects
 
-def split_and_distribute_objects(input_path, output_dir, printer_count, build_volume=BUILD_VOLUME,
+
+def split_and_distribute_objects(input_path, file_manager, job_name, printer_count, build_volume=BUILD_VOLUME,
                                volume_threshold=0.001, min_faces=4, padding=10):
     """
     Splits an STL into naturally separated objects and distributes them among printers.
+    Uses FileManager to handle file paths and storage.
     """
     # Load the STL model
     print("Loading STL file...")
@@ -143,8 +147,8 @@ def split_and_distribute_objects(input_path, output_dir, printer_count, build_vo
         group_index = i % printer_count
         object_groups[group_index].append(obj)
 
-    # Process each group
-    Path(output_dir).mkdir(exist_ok=True)
+    # Get job folders
+    job_folders = file_manager.create_job_folders(job_name)
     output_files = []
 
     # Connect to remote storage
@@ -160,16 +164,17 @@ def split_and_distribute_objects(input_path, output_dir, printer_count, build_vo
                 )
                 
                 if arranged_scene.geometry:
-                    # Save locally first 
-                    local_file = os.path.join(output_dir, f"group_{i+1}.stl")
-                    arranged_scene.export(local_file)
-                    print(f"Exported {local_file}")
+                    # Get paths for this group
+                    paths = file_manager.get_job_file_path(job_name, 'stl', i+1)
+                    
+                    # Save locally
+                    arranged_scene.export(paths['local'])
+                    print(f"Exported {paths['local']}")
 
-                    # Then upload to remote
-                    remote_path = f"{SFTP_CONFIG['remote_base_path']}/split_objects/group_{i+1}.stl"
-                    if remote_storage.upload_file(local_file, remote_path):
-                        output_files.append(local_file)
-                        print(f"Uploaded to {remote_path}")
+                    # Upload to remote
+                    if remote_storage.upload_file(paths['local'], paths['remote']):
+                        output_files.append(paths['local'])
+                        print(f"Uploaded to {paths['remote']}")
                 
                 if unplaced:
                     print(f"Warning: {len(unplaced)} objects in group {i+1} could not be placed.")
@@ -179,32 +184,36 @@ def split_and_distribute_objects(input_path, output_dir, printer_count, build_vo
     
     return output_files
 
-def slice_with_prusa_slicer(stl_path, output_dir, config_path):
+
+def slice_with_prusa_slicer(stl_path, file_manager, job_name, group_number, config_path):
     """
     Slices an STL to G-code using PrusaSlicer CLI.
+    Uses FileManager to handle file paths and storage.
     """
     prusa_path = "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe"
+    
+    # Get paths for this group's gcode
+    paths = file_manager.get_job_file_path(job_name, 'gcode', group_number)
+    
     cmd = [
         prusa_path,
         str(stl_path),
         "--load", config_path,
         "--export-gcode",
-        "--output", os.path.join(output_dir, Path(stl_path).stem + ".gcode")
+        "--output", paths['local']
     ]
+    
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         print(f"Successfully sliced {stl_path}")
-        # if result.stderr:
-        #     print("Slicer messages:", result.stderr)
+        
         # After successful slice, upload the G-code
-        gcode_file = os.path.join(output_dir, Path(stl_path).stem + ".gcode")
-        if os.path.exists(gcode_file):
+        if os.path.exists(paths['local']):
             remote_storage = RemoteStorage(SFTP_CONFIG)
             remote_storage.connect()
             try:
-                remote_path = f"{SFTP_CONFIG['remote_base_path']}/gcode/{Path(stl_path).stem}.gcode"
-                if remote_storage.upload_file(gcode_file, remote_path):
-                    print(f"Uploaded G-code to {remote_path}")
+                if remote_storage.upload_file(paths['local'], paths['remote']):
+                    print(f"Uploaded G-code to {paths['remote']}")
             finally:
                 remote_storage.disconnect()
                 
@@ -213,28 +222,33 @@ def slice_with_prusa_slicer(stl_path, output_dir, config_path):
     except FileNotFoundError:
         print("PrusaSlicer executable not found at:", prusa_path)
 
-
 if __name__ == "__main__":
+    # Base paths configuration
+    base_local_path = Path("backend/slicer/output")
+    base_remote_path = SFTP_CONFIG['remote_base_path']
+    
+    # Initialize file manager
+    file_manager = FileManager(base_local_path, base_remote_path)
+    
+    # Generate unique job name
+    job_name = file_manager.generate_unique_folder_name()
+    
     input_stl = "backend/slicer/input/BlindNav.stl"
-    split_dir = "backend/slicer/output/split_objects"
-    gcode_dir = "backend/slicer/output/gcode"
     config = "backend/slicer/config/config.ini"    # PrusaSlicer settings
     printer_count = 4
-    padding = 10  # Increased padding for better separation
-
-    # Create output directories
-    Path(split_dir).mkdir(parents=True, exist_ok=True)
-    Path(gcode_dir).mkdir(parents=True, exist_ok=True)
+    padding = 10
 
     print("Starting processing...")
     print(f"Input file: {input_stl}")
+    print(f"Job name: {job_name}")
     print(f"Build volume: {BUILD_VOLUME}")
     print(f"Number of printers: {printer_count}")
 
     # Process STL
     grouped_stl_files = split_and_distribute_objects(
         input_stl,
-        split_dir,
+        file_manager,
+        job_name,
         printer_count,
         BUILD_VOLUME,
         padding=padding
@@ -245,8 +259,8 @@ if __name__ == "__main__":
         
         # Slice files
         print("\nSlicing files...")
-        for stl_file in grouped_stl_files:
-            slice_with_prusa_slicer(stl_file, gcode_dir, config)
+        for i, stl_file in enumerate(grouped_stl_files):
+            slice_with_prusa_slicer(stl_file, file_manager, job_name, i+1, config)
         
         print("\nProcessing complete!")
     else:
