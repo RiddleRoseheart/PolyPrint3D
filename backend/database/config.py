@@ -1,5 +1,3 @@
-# backend/database/config.py
-
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from pathlib import Path

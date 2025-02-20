@@ -1,5 +1,3 @@
-# backend/routes/slicer_routes.py
-
 from flask import Blueprint, jsonify, request, Response, current_app
 from flask_login import login_required, current_user
 from backend.services.slicer_service import SlicerService
