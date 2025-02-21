@@ -21,26 +21,22 @@ except ImportError:
 
 # Printer's Build Volume
 BUILD_VOLUME = (250, 210, 210)  # (X, Y, Z)
-
+ 
 def split_disconnected_components(mesh):
     """
     Split mesh into naturally disconnected components without cutting through objects.
     Only separates objects that are physically disconnected from each other.
-    
     Parameters:
     - mesh: trimesh object
-    
     Returns:
     - list of trimesh objects
     """
     # Use trimesh's built-in split function with only_watertight=False to preserve non-watertight parts
     components = mesh.split(only_watertight=False)
-    
     # Filter out invalid components (those with too few vertices)
     valid_components = [comp for comp in components if len(comp.vertices) >= 4]
-    
     return valid_components
-
+ 
 def check_object_fits(obj, build_volume):
     """
     Check if an object fits within the build volume.
@@ -48,7 +44,7 @@ def check_object_fits(obj, build_volume):
     x_max, y_max, z_max = build_volume
     width, depth, height = obj.bounding_box.extents
     return (width <= x_max and depth <= y_max and height <= z_max)
-
+ 
 def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10):
     """
     Arranges objects in print area with proper spacing.
@@ -56,7 +52,6 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
     scene = trimesh.Scene()
     x_max, y_max, z_max = build_volume
     unplaced_objects = []
-    
     # Filter and sort objects
     placeable_objects = []
     for obj in objects:
@@ -66,31 +61,25 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
             placeable_objects.append(obj)
         else:
             unplaced_objects.append(obj)
-    
     # Sort by base area for better packing
     placeable_objects.sort(
         key=lambda obj: obj.bounding_box.extents[0] * obj.bounding_box.extents[1],
         reverse=True
     )
-    
     x_pos, y_pos = 0, 0
     max_height_in_row = 0
-    
     for obj in placeable_objects:
         bbox = obj.bounding_box
         width, depth, height = bbox.extents
-        
         # Check if we need to move to next row
         if x_pos + width + padding > x_max:
             x_pos = 0
             y_pos += max_height_in_row + padding
             max_height_in_row = 0
-        
         # Check if object fits in Y direction
         if y_pos + depth + padding > y_max:
             unplaced_objects.append(obj)
             continue
-        
         # Create a copy and place it
         obj_copy = obj.copy()
         translation = [
@@ -99,15 +88,11 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
             0  # Place directly on the build plate
         ]
         obj_copy.apply_translation(translation)
-        
         # Update position tracking
         x_pos += width + padding
         max_height_in_row = max(max_height_in_row, depth)
-        
         scene.add_geometry(obj_copy)
-    
     return scene, unplaced_objects
-
 
 def split_and_distribute_objects(input_path, file_manager, job_name, printer_count, build_volume=BUILD_VOLUME,
                                volume_threshold=0.001, min_faces=4, padding=10):
@@ -118,31 +103,26 @@ def split_and_distribute_objects(input_path, file_manager, job_name, printer_cou
     # Load the STL model
     print("Loading STL file...")
     mesh = trimesh.load_mesh(input_path)
-    
     # Split into natural components
     print("Splitting into components...")
     objects = split_disconnected_components(mesh)
-    
     if not objects:
         print("No valid objects found in the STL file.")
         return []
-
+ 
     # Filter objects
     filtered_objects = []
     for obj in objects:
         if obj.volume >= volume_threshold and len(obj.faces) >= min_faces:
             filtered_objects.append(obj)
-    
     if not filtered_objects:
         print("No objects remained after filtering.")
         return []
-    
     print(f"Found {len(filtered_objects)} valid objects.")
-
+ 
     # Distribute objects across printers
     object_groups = [[] for _ in range(printer_count)]
     filtered_objects.sort(key=lambda obj: obj.volume, reverse=True)
-    
     for i, obj in enumerate(filtered_objects):
         group_index = i % printer_count
         object_groups[group_index].append(obj)
@@ -216,7 +196,7 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, group_number, conf
                     print(f"Uploaded G-code to {paths['remote']}")
             finally:
                 remote_storage.disconnect()
-                
+
     except subprocess.CalledProcessError as e:
         print(f"Error slicing {stl_path}: {e}")
     except FileNotFoundError:
@@ -243,7 +223,7 @@ if __name__ == "__main__":
     print(f"Job name: {job_name}")
     print(f"Build volume: {BUILD_VOLUME}")
     print(f"Number of printers: {printer_count}")
-
+ 
     # Process STL
     grouped_stl_files = split_and_distribute_objects(
         input_stl,
@@ -253,15 +233,14 @@ if __name__ == "__main__":
         BUILD_VOLUME,
         padding=padding
     )
-
+ 
     if grouped_stl_files:
         print(f"\nGenerated {len(grouped_stl_files)} STL files")
-        
         # Slice files
         print("\nSlicing files...")
         for i, stl_file in enumerate(grouped_stl_files):
             slice_with_prusa_slicer(stl_file, file_manager, job_name, i+1, config)
-        
+
         print("\nProcessing complete!")
     else:
         print("\nNo output files were generated. Please check the input file.")

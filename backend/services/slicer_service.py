@@ -1,29 +1,18 @@
 from pathlib import Path
 from typing import Dict, List, Optional
+from datetime import datetime
+import uuid
+import logging
+from backend.database.config import db
+from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User
 from backend.slicer.scripts.slicer import split_and_distribute_objects, slice_with_prusa_slicer
-from dataclasses import dataclass
-from enum import Enum
 
-class SlicingStatus(Enum):
-    """Enumeration of possible slicing job statuses"""
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    NOT_FOUND = "not_found"
-
-@dataclass
-class SlicingJob:
-    """Data class for slicing job information"""
-    status: SlicingStatus
-    error: Optional[str] = None
-    sliced_files: List[Path] = None
+logger = logging.getLogger(__name__)
 
 class SlicerService:
-    """
-    Service for handling 3D model slicing operations
-    """
+    """Service for handling 3D model slicing operations with user permissions"""
     
-    def __init__(self, output_dir: str, config_path: str):
+    def __init__(self, output_dir: str | Path, config_path: str | Path):
         """
         Initialize SlicerService
         
@@ -33,9 +22,6 @@ class SlicerService:
         """
         self.output_dir = Path(output_dir)
         self.config_path = Path(config_path)
-        self.jobs: Dict[str, SlicingJob] = {}
-        
-        # Initialize directory structure
         self._initialize_directories()
         
     def _initialize_directories(self) -> None:
@@ -46,105 +32,124 @@ class SlicerService:
         for directory in [self.output_dir, self.split_dir, self.gcode_dir]:
             directory.mkdir(parents=True, exist_ok=True)
 
-    def start_slicing(self, file_obj: 'File', printer_count: int = 4) -> None:
+    def start_slicing(self, file_id: str, user: User, settings: Dict, printer_count: int = 4) -> List[PrintRequest]:
         """
-        Start a slicing job for given file
+        Start slicing job for given file
         
         Args:
-            file_obj: File object containing STL file information
-            printer_count: Number of printers to distribute objects across
+            file_id: ID of file to slice
+            user: User requesting the slice
+            settings: Slicing settings
+            printer_count: Number of printers to distribute across
+            
+        Returns:
+            List of created PrintRequest objects
             
         Raises:
-            ValueError: If file_obj is invalid or file doesn't exist
+            ValueError: If file not found or user lacks permission
         """
-        if not file_obj or not file_obj.id:
-            raise ValueError("Invalid file object")
-            
-        file_path = Path(file_obj.path)
-        if not file_path.exists():
-            raise ValueError(f"File not found: {file_path}")
-
-        job_id = file_obj.id
-        self.jobs[job_id] = SlicingJob(status=SlicingStatus.PROCESSING)
-
         try:
+            original_file = UploadedFile.query.get(file_id)
+            if not original_file:
+                raise ValueError("File not found")
+                
+            if original_file.user_id != user.id and user.role != 'admin':
+                raise ValueError("Access denied")
+
             # Split STL into multiple parts
-            grouped_stl_files = split_and_distribute_objects(
-                str(file_path),
+            split_files = split_and_distribute_objects(
+                str(original_file.file_path),
                 str(self.split_dir),
                 printer_count
             )
 
-            if not grouped_stl_files:
-                raise ValueError("No valid parts generated from STL file")
-
-            # Process each part
-            processed_files = []
-            for stl_file in grouped_stl_files:
-                output_file = slice_with_prusa_slicer(
-                    stl_file, 
-                    str(self.gcode_dir), 
-                    str(self.config_path)
+            print_requests = []
+            for stl_path in split_files:
+                print_request = PrintRequest(
+                    id=str(uuid.uuid4()),
+                    file_path=str(stl_path),
+                    original_file_id=original_file.id,
+                    user_id=user.id,
+                    state="processing",
+                    **settings
                 )
-                processed_files.append(Path(output_file))
+                db.session.add(print_request)
+                db.session.flush()
 
-            # Update job status
-            self.jobs[job_id] = SlicingJob(
-                status=SlicingStatus.COMPLETED,
-                sliced_files=processed_files
-            )
+                # Generate GCode
+                gcode_path = self.gcode_dir / f"{print_request.id}.gcode"
+                slice_with_prusa_slicer(str(stl_path), str(gcode_path), str(self.config_path))
 
+                gcode_file = GCodeFile(
+                    id=str(uuid.uuid4()),
+                    file_path=str(gcode_path),
+                    print_request_id=print_request.id
+                )
+                db.session.add(gcode_file)
+                
+                print_request.state = "completed"
+                print_requests.append(print_request)
+
+            db.session.commit()
+            logger.info(f"Completed slicing for file {file_id} by user {user.id}")
+            return print_requests
+        
         except Exception as e:
-            print(f"Slicing error for job {job_id}: {str(e)}") 
-            self.jobs[job_id] = SlicingJob(
-                status=SlicingStatus.FAILED,
-                error=str(e)
-            )
+            db.session.rollback()
+            logger.error(f"Slicing error: {str(e)}")
+            raise
 
-    def get_status(self, job_id: str) -> Dict:
+    def get_print_request(self, request_id: str, user: User) -> Optional[PrintRequest]:
         """
-        Get status of a slicing job
+        Get print request if user has permission
         
         Args:
-            job_id: ID of the job to check
+            request_id: ID of print request
+            user: User requesting access
             
         Returns:
-            Dictionary containing job status and any error messages
+            PrintRequest if found and accessible, None otherwise
         """
-        job = self.jobs.get(job_id)
-        if not job:
-            return {"status": SlicingStatus.NOT_FOUND.value}
-            
-        response = {"status": job.status.value}
-        if job.error:
-            response["error"] = job.error
-        if job.sliced_files:
-            response["files"] = [str(f) for f in job.sliced_files]
-            
-        return response
+        request = PrintRequest.query.get(request_id)
+        if request and (request.user_id == user.id or user.role == 'admin'):
+            return request
+        return None
 
-    def cleanup_job(self, job_id: str) -> bool:
+    def get_user_print_requests(self, user: User) -> List[PrintRequest]:
+        """Get all print requests for a user"""
+        if user.role == 'admin':
+            return PrintRequest.query.all()
+        return PrintRequest.query.filter_by(user_id=user.id).all()
+
+    def cleanup_print_request(self, request_id: str, user: User) -> bool:
         """
-        Clean up files associated with a job
+        Clean up files associated with a print request
         
         Args:
-            job_id: ID of the job to clean up
+            request_id: ID of print request to clean up
+            user: User requesting cleanup
             
         Returns:
-            bool: True if cleanup was successful
+            bool indicating success
         """
-        job = self.jobs.get(job_id)
-        if not job or not job.sliced_files:
-            return False
-
         try:
-            for file_path in job.sliced_files:
-                if file_path.exists():
-                    file_path.unlink()
-            
-            del self.jobs[job_id]
+            request = self.get_print_request(request_id, user)
+            if not request:
+                return False
+
+            # Delete files
+            for path_str in [request.file_path, request.gcode_file.file_path if request.gcode_file else None]:
+                if path_str:
+                    path = Path(path_str)
+                    if path.exists():
+                        path.unlink()
+
+            db.session.delete(request)
+            db.session.commit()
+            logger.info(f"Cleaned up print request {request_id}")
             return True
             
         except Exception as e:
-            print(f"Cleanup error for job {job_id}: {str(e)}")  
+            db.session.rollback()
+            logger.error(f"Cleanup error: {str(e)}")
             return False
