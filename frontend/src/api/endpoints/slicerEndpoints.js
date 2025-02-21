@@ -2,55 +2,78 @@ import axiosInstance from '../axiosConfig';
 import { handleError } from '../../utils/errorHandler';
 
 /**
-* API endpoints for slicing operations
-*/
+ * API endpoints for slicing operations
+ */
 
 /**
-* Checks the status of a slicing job
-* @param {string} jobId - ID of the slicing job to check
-* @returns {Promise<Object>} Current status of the slicing job
-* @throws {Error} If status check fails
-*/
-export const checkSlicingStatus = async (jobId) => {
-   try {
-       const response = await axiosInstance.get(`/api/slicer/status/${jobId}`);
-       return response.data;
-   } catch (error) {
-       handleError(error);
-   }
+ * Start slicing job for a file
+ * @param {string} fileId - ID of the file to slice
+ * @param {Object} settings - Slicing settings
+ * @param {string} [settings.filament] - Filament type
+ * @param {string} [settings.dimension] - Print dimensions
+ * @param {string} [settings.filling] - Fill settings
+ * @param {string} [settings.layer] - Layer settings
+ * @returns {Promise<Object>} Slicing job data
+ * @throws {Error} If slicing fails
+ */
+export const sliceSTLFile = async (fileId, settings = {}) => {
+    try {
+        const response = await axiosInstance.post('/api/slicer/slice', {
+            fileId,
+            settings
+        });
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
 };
 
 /**
-* Initiates slicing of an STL file with specified settings
-* @param {Object} slicingSettings - Settings for the slicing operation
-* @param {string} slicingSettings.fileId - ID of the STL file to slice
-* @param {Object} slicingSettings.settings - Slicing parameters
-* @param {string} slicingSettings.settings.material - Print material
-* @param {string} slicingSettings.settings.quality - Print quality level
-* @param {number} slicingSettings.settings.infill - Infill percentage
-* @param {string} [slicingSettings.settings.filamentColor] - Color of filament
-* @returns {Promise<Object>} Slicing job response data
-* @throws {Error} If slicing operation fails
-*/
-export const sliceSTLFile = async (slicingSettings) => {
-   try {
-       console.log('Sending slicing request:', slicingSettings);
-       
-       const response = await axiosInstance.post('/api/slicer/slice', slicingSettings);
-       
-       console.log('Slicing response:', response.data);
-       return response.data;
-   } catch (error) {
-       console.error('Slicing error:', error);
-       throw new Error(
-           error.response?.data?.message || 
-           error.message || 
-           'Failed to slice file'
-       );
-   }
+ * Get all print requests for current user
+ * @returns {Promise<Object>} List of print requests
+ * @throws {Error} If retrieval fails
+ */
+export const getPrintRequests = async () => {
+    try {
+        const response = await axiosInstance.get('/api/slicer/requests');
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Get specific print request
+ * @param {string} requestId - ID of the print request
+ * @returns {Promise<Object>} Print request data
+ * @throws {Error} If retrieval fails
+ */
+export const getPrintRequest = async (requestId) => {
+    try {
+        const response = await axiosInstance.get(`/api/slicer/requests/${requestId}`);
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Delete print request and associated files
+ * @param {string} requestId - ID of the print request
+ * @returns {Promise<void>} No content on success
+ * @throws {Error} If deletion fails
+ */
+export const deletePrintRequest = async (requestId) => {
+    try {
+        await axiosInstance.delete(`/api/slicer/requests/${requestId}`);
+    } catch (error) {
+        handleError(error);
+    }
 };
 
 export default {
-   checkSlicingStatus,
-   sliceSTLFile
+    sliceSTLFile,
+    getPrintRequests,
+    getPrintRequest,
+    deletePrintRequest
 };

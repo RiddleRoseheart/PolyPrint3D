@@ -1,145 +1,124 @@
-import os
+from pathlib import Path
 from datetime import datetime
 import uuid
-from pathlib import Path
 from werkzeug.utils import secure_filename
-from backend.models.file import File
-from typing import Optional, Dict
+from typing import Optional, List
+from flask import current_app
+import logging
+from backend.database.config import db
+from backend.database.models import UploadedFile, User
+
+logger = logging.getLogger(__name__)
 
 class FileService:
-    """
-    Service class for handling file operations including storage and retrieval
-    """
+    """Service class for handling file operations with user permissions"""
     
-    def __init__(self, upload_folder: str):
+    def __init__(self, upload_folder: str | Path):
         """
-        Initialize FileService with specified upload directory
+        Initialize FileService
         
         Args:
-            upload_folder (str): Path to directory for file storage
+            upload_folder: Path to directory for file storage (str or Path)
         """
         self.upload_folder = Path(upload_folder)
         self.upload_folder.mkdir(parents=True, exist_ok=True)
-        self.files: Dict[str, File] = {}  # Temporary in-memory storage
         
-    def save_file(self, file) -> File:
+    def save_file(self, file, user: User) -> UploadedFile:
         """
-        Save uploaded file and create associated File object
+        Save uploaded file and create database entry
         
         Args:
-            file: Uploaded file object from request
+            file: Uploaded file object
+            user: User who uploaded the file
             
         Returns:
-            File: Created File object with metadata
+            UploadedFile: Created file object
             
         Raises:
+            ValueError: If file is invalid
             IOError: If file cannot be saved
         """
         try:
-            # Generate unique ID and secure filename
             file_id = str(uuid.uuid4())
             filename = secure_filename(file.filename)
-            file_path = self.upload_folder / filename
-            
-            # Ensure file doesn't already exist
-            while file_path.exists():
-                file_id = str(uuid.uuid4())
-                filename = f"{file_id}_{secure_filename(file.filename)}"
-                file_path = self.upload_folder / filename
+            file_name = f"{file_id}_{filename}"
+            file_path = self.upload_folder / file_name
             
             # Save file
             file.save(str(file_path))
             
-            # Create and store File object
-            current_time = datetime.now()
-            file_obj = File(
+            # Create database entry
+            file_obj = UploadedFile(
                 id=file_id,
                 filename=filename,
-                path=str(file_path),
+                file_path=str(file_path),
                 status="uploaded",
-                created_at=current_time,
-                updated_at=current_time
+                created_at=datetime.utcnow(),
+                user_id=user.id
             )
-            self.files[file_id] = file_obj
             
+            db.session.add(file_obj)
+            db.session.commit()
+            
+            logger.info(f"File saved: {filename} by user {user.id}")
             return file_obj
             
         except Exception as e:
-            # Clean up any partially saved file
-            if file_path.exists():
-                file_path.unlink()
-            raise IOError(f"Failed to save file: {str(e)}")
+            db.session.rollback()
+            logger.error(f"Error saving file: {str(e)}")
+            raise
 
-    def get_file(self, file_id: str) -> Optional[File]:
+    def get_user_files(self, user: User) -> List[UploadedFile]:
+        """Get all files for a specific user"""
+        return UploadedFile.query.filter_by(user_id=user.id).all()
+    
+    def get_all_files(self) -> List[UploadedFile]:
+        """Get all files (admin only)"""
+        return UploadedFile.query.all()
+
+    def get_file(self, file_id: str, user: User) -> Optional[UploadedFile]:
         """
-        Retrieve File object by ID
+        Get file if user has permission
         
         Args:
-            file_id (str): ID of file to retrieve
+            file_id: ID of file to retrieve
+            user: User requesting the file
             
         Returns:
-            Optional[File]: File object if found, None otherwise
+            UploadedFile if found and user has permission, None otherwise
         """
-        return self.files.get(file_id)
+        file_obj = UploadedFile.query.get(file_id)
+        if file_obj and (file_obj.user_id == user.id or user.role == 'admin'):
+            return file_obj
+        return None
 
-    def delete_file(self, file_id: str) -> bool:
+    def delete_file(self, file_id: str, user: User) -> bool:
         """
-        Delete file and its associated metadata
+        Delete file if user has permission
         
         Args:
-            file_id (str): ID of file to delete
+            file_id: ID of file to delete
+            user: User requesting deletion
             
         Returns:
-            bool: True if file was deleted, False if not found
+            bool: True if deleted, False if not found or no permission
             
         Raises:
             IOError: If file exists but cannot be deleted
         """
-        try:
-            if file_id in self.files:
-                file_obj = self.files[file_id]
-                file_path = Path(file_obj.path)
-                
+        file_obj = UploadedFile.query.get(file_id)
+        if file_obj and (file_obj.user_id == user.id or user.role == 'admin'):
+            try:
+                file_path = Path(file_obj.file_path)
                 if file_path.exists():
                     file_path.unlink()
                 
-                del self.files[file_id]
+                db.session.delete(file_obj)
+                db.session.commit()
+                logger.info(f"File deleted: {file_id} by user {user.id}")
                 return True
-                
-            return False
-            
-        except Exception as e:
-            raise IOError(f"Failed to delete file: {str(e)}")
-
-    def update_file_status(self, file_id: str, status: str) -> Optional[File]:
-        """
-        Update status of a file
-        
-        Args:
-            file_id (str): ID of file to update
-            status (str): New status value
-            
-        Returns:
-            Optional[File]: Updated File object if found, None otherwise
-        """
-        file_obj = self.files.get(file_id)
-        if file_obj:
-            file_obj.status = status
-            file_obj.updated_at = datetime.now()
-            return file_obj
-        return None
-
-    def validate_file_exists(self, file_id: str) -> bool:
-        """
-        Check if file exists both in memory and on disk
-        
-        Args:
-            file_id (str): ID of file to check
-            
-        Returns:
-            bool: True if file exists both in memory and on disk
-        """
-        file_obj = self.files.get(file_id)
-        if file_obj:
-            return Path(file_obj.path).exists()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Error deleting file: {str(e)}")
+                raise
         return False
