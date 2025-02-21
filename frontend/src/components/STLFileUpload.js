@@ -7,100 +7,144 @@ import {
   Paper,
   Alert
 } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { LoadingButton } from '@mui/lab';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { uploadSTLFile } from '../api/endpoints/fileEndpoints';
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; //placeholder 
+/**
+ * Configuration constants for file upload constraints
+ */
+const UPLOAD_CONFIG = {
+  MAX_FILE_SIZE: 100 * 1024 * 1024, // 100MB limit
+  ALLOWED_FILE_TYPE: '.stl',
+  SIZE_DISPLAY_DECIMALS: 2
+};
 
+/**
+ * STL File Upload component that handles file selection and upload
+ * @param {Object} props
+ * @param {Function} props.onFileUploaded - Callback function called after successful upload
+ */
 const STLFileUpload = ({ onFileUploaded }) => {
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [uploadState, setUploadState] = useState({
+    progress: 0,
+    error: '',
+    selectedFile: null,
+    isLoading: false
+  });
 
+  /**
+   * Validates the selected file against size and type constraints
+   * @param {File} file - The file to validate
+   * @throws {Error} If validation fails
+   */
   const validateFile = (file) => {
     if (!file) {
-      setError('Please select a file');
-      return false;
+      throw new Error('Please select a file');
     }
 
-    if (!file.name.toLowerCase().endsWith('.stl')) {
-      setError('Only STL files are allowed');
-      return false;
+    if (!file.name.toLowerCase().endsWith(UPLOAD_CONFIG.ALLOWED_FILE_TYPE)) {
+      throw new Error(`Only ${UPLOAD_CONFIG.ALLOWED_FILE_TYPE.toUpperCase()} files are allowed`);
     }
 
-    if (file.size > MAX_FILE_SIZE) {
-      setError(`File size should not exceed ${MAX_FILE_SIZE / 1024 / 1024}MB`);
-      return false;
+    if (file.size > UPLOAD_CONFIG.MAX_FILE_SIZE) {
+      throw new Error(
+        `File size should not exceed ${UPLOAD_CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB`
+      );
     }
 
     return true;
   };
 
+  /**
+   * Handles file selection from input
+   * @param {Event} event - File input change event
+   */
   const handleFileSelect = (event) => {
-    setError('');
+    setUploadState(prev => ({ ...prev, error: '' }));
     const file = event.target.files[0];
     
-    if (validateFile(file)) {
-      setSelectedFile(file);
+    try {
+      if (validateFile(file)) {
+        setUploadState(prev => ({ ...prev, selectedFile: file }));
+      }
+    } catch (err) {
+      setUploadState(prev => ({ ...prev, error: err.message }));
     }
   };
 
+  /**
+   * Handles the file upload process
+   */
   const handleUpload = async () => {
-    setIsLoading(true); 
-    if (!selectedFile) {
-      setError('Please select a file first');
+    setUploadState(prev => ({ 
+      ...prev, 
+      isLoading: true, 
+      error: '' 
+    }));
+    
+    if (!uploadState.selectedFile) {
+      setUploadState(prev => ({ 
+        ...prev, 
+        error: 'Please select a file first',
+        isLoading: false 
+      }));
       return;
     }
 
-    const formData = new FormData();
-    formData.append('stlFile', selectedFile);
-
     try {
-      /*const response = await fetch('/api/files/upload', {
-        method: 'POST',
-        body: formData,
-        onUploadProgress: (progressEvent) => {
-          const progress = (progressEvent.loaded / progressEvent.total) * 100;
-          setUploadProgress(progress);
-        },
+      const formData = new FormData();
+      formData.append('file', uploadState.selectedFile);
+
+      const response = await uploadSTLFile(formData);
+      
+      setUploadState(prev => ({ ...prev, progress: 100 }));
+      
+      onFileUploaded({
+        id: response.id,
+        filename: response.filename,
+        status: response.status,
+        created_at: response.created_at,
+        updated_at: response.updated_at
       });
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const data = await response.json();
-      console.log('Upload successful:', data);
-       */
-
-    // Simulation //TODO replace with actual API call (comemnted out above)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log('Upload successful (mocked):', {
-      id: 'mock123',
-      fileName: selectedFile.name,
-      uploadedAt: new Date().toISOString()
-    });
-
-
-      setUploadProgress(0);
-      setSelectedFile(null);
-      onFileUploaded(selectedFile);
+      resetForm();
 
     } catch (err) {
-      setError('Failed to upload file: ' + err.message);
+      setUploadState(prev => ({ 
+        ...prev, 
+        error: err.message || 'Failed to upload file'
+      }));
+      console.error('Upload error:', err);
     } finally {
-      setIsLoading(false); 
+      setUploadState(prev => ({ ...prev, isLoading: false }));
     }
+  };
+
+  /**
+   * Resets the form to its initial state
+   */
+  const resetForm = () => {
+    setUploadState({
+      progress: 0,
+      error: '',
+      selectedFile: null,
+      isLoading: false
+    });
+  };
+
+  const formatFileSize = (bytes) => {
+    return (bytes / 1024 / 1024).toFixed(UPLOAD_CONFIG.SIZE_DISPLAY_DECIMALS);
   };
 
   return (
     <Paper elevation={3} sx={{ p: 3, maxWidth: 600, mx: 'auto', mt: 4 }}>
       <Box sx={{ textAlign: 'center' }}>
         <input
-          accept=".stl"
+          accept={UPLOAD_CONFIG.ALLOWED_FILE_TYPE}
           style={{ display: 'none' }}
           id="stl-file-upload"
+          name="file" 
           type="file"
           onChange={handleFileSelect}
         />
@@ -110,47 +154,63 @@ const STLFileUpload = ({ onFileUploaded }) => {
             variant="contained"
             component="span"
             startIcon={<CloudUploadIcon />}
-            disabled={isLoading}
+            disabled={uploadState.isLoading}
           >
             Select STL File
           </Button>
         </label>
 
-        {selectedFile && (
-          <Typography variant="body1" sx={{ mt: 2 }}>
-            Selected file: {selectedFile.name}
-          </Typography>
-        )}
-
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {uploadProgress > 0 && (
+        {uploadState.selectedFile && (
           <Box sx={{ mt: 2 }}>
-            <LinearProgress 
-              variant="determinate" 
-              value={uploadProgress} 
-            />
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Upload Progress: {Math.round(uploadProgress)}%
+            <Typography variant="body1">
+              Selected file: {uploadState.selectedFile.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Size: {formatFileSize(uploadState.selectedFile.size)} MB
             </Typography>
           </Box>
         )}
-{selectedFile && !error && (
-          <LoadingButton
-            loading={isLoading}
-            loadingPosition="start"
-            startIcon={<CloudUploadIcon />}
-            variant="contained"
-            color="primary"
-            onClick={handleUpload}
-            sx={{ mt: 2 }}
-          >
-            {isLoading ? 'Processing...' : 'Upload File'}
-          </LoadingButton>
+
+        {uploadState.error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {uploadState.error}
+          </Alert>
+        )}
+
+        {uploadState.progress > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <LinearProgress 
+              variant="determinate" 
+              value={uploadState.progress} 
+            />
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Upload Progress: {Math.round(uploadState.progress)}%
+            </Typography>
+          </Box>
+        )}
+
+        {uploadState.selectedFile && !uploadState.error && (
+          <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <LoadingButton
+              loading={uploadState.isLoading}
+              loadingPosition="start"
+              startIcon={<CloudUploadIcon />}
+              variant="contained"
+              color="primary"
+              onClick={handleUpload}
+            >
+              {uploadState.isLoading ? 'Uploading...' : 'Upload File'}
+            </LoadingButton>
+            
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={resetForm}
+              disabled={uploadState.isLoading}
+            >
+              Cancel
+            </Button>
+          </Box>
         )}
       </Box>
     </Paper>

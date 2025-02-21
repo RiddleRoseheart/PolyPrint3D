@@ -1,5 +1,6 @@
 @echo off
 
+:: Create .env if it doesn't exist
 IF NOT EXIST .env (
     IF EXIST .env.template (
         copy .env.template .env
@@ -9,8 +10,16 @@ IF NOT EXIST .env (
     )
 )
 
+:: Create and activate virtual environment
 python -m venv venv --clear
-call venv\Scripts\activate
-pip install -r requirements.txt
-set FLASK_APP=backend.main
-flask run
+call venv\Scripts\activate.bat
+
+:: Install requirements
+python -m pip install -r requirements.txt
+
+:: Set Flask environment variables
+set FLASK_APP=backend/main.py
+set FLASK_ENV=development
+
+:: Run Flask
+python -m flask run
