@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Form, UploadFile, File
 from fastapi.responses import JSONResponse
+
 from logging_config import logger
 from octoprint_connector import *
 from octoprint_info_retriever import *
@@ -62,7 +63,6 @@ def connect(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to connect: {e}")
         raise HTTPException(status_code=500, detail="Failed to connect to OctoPrint server.")
-
 @app.get("/disconnect", responses={
     200: {
         "description": "Successful disconnection",
@@ -100,7 +100,6 @@ def disconnect(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to disconnect: {e}")
         raise HTTPException(status_code=500, detail="Failed to disconnect from OctoPrint server.")
-
 @app.get("/connection", responses={
     200: {
         "description": "Connection information retrieved successfully",
@@ -136,7 +135,6 @@ def get_connection_info(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get connection info: {e}")
         raise HTTPException(status_code=500, detail="Failed to get connection info from OctoPrint server.")
-
 @app.get("/flags", responses={
     200: {
         "description": "Flags retrieved successfully",
@@ -174,7 +172,6 @@ def get_flags(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get flags: {e}")
         raise HTTPException(status_code=500, detail="Failed to get flags from OctoPrint server.")
-
 @app.get("/temperature/bed", responses={
     200: {
         "description": "Bed temperature retrieved successfully",
@@ -212,7 +209,6 @@ def get_bed_temperature(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get bed temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get bed temperature from OctoPrint server.")
-
 @app.get("/temperature/tool0", responses={
     200: {
         "description": "Tool0 temperature retrieved successfully",
@@ -250,7 +246,6 @@ def get_tool0_temperature(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get tool0 temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get tool0 temperature from OctoPrint server.")
-
 @app.get("/temperature/bed/target", responses={
     200: {
         "description": "Target bed temperature retrieved successfully",
@@ -288,7 +283,6 @@ def get_target_bed_temperature(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get target bed temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get target bed temperature from OctoPrint server.")
-
 @app.get("/temperature/tool0/target", responses={
     200: {
         "description": "Target tool0 temperature retrieved successfully",
@@ -326,7 +320,6 @@ def get_target_tool0_temperature(ip: str, api_key: str):
     except Exception as e:
         logger.error(f"Failed to get target tool0 temperature: {e}")
         raise HTTPException(status_code=500, detail="Failed to get target tool0 temperature from OctoPrint server.")
-
 @app.get("/job/status", responses={
     200: {
         "description": "Job status retrieved successfully",
@@ -361,7 +354,6 @@ def job_status(ip: str, api_key: str):
         return job_status
     except Exception as e:
         logger.error(f"Failed to get job status: {e}")
-
 @app.get("/files", responses={
     200: {
         "description": "Files retrieved successfully",
@@ -388,15 +380,14 @@ def job_status(ip: str, api_key: str):
         }
     }
 })
-def cancel_job(ip: str, api_key: str):
+def all_files(ip: str, api_key: str):
     if not is_octoprint_server(ip, api_key):
         raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
     try:
-        all_files = get_all_files(ip, api_key)
-        return all_files
+        all_files_json = get_all_files(ip, api_key)
+        return all_files_json
     except Exception as e:
         logger.error(f"Failed to get job status: {e}")
-
 @app.delete("/delete", responses={
     200: {
         "description": "File deleted successfully",
@@ -457,7 +448,6 @@ def delete_file_endpoint(ip: str, api_key: str, name: str):
     except Exception as e:
         logger.error(f"Failed to delete file {name}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete file {name} from OctoPrint server.")
-
 @app.post("/upload", responses={
     200: {
         "description": "File uploaded successfully",
@@ -495,7 +485,9 @@ def upload_file(ip: str, api_key: str, path:str)-> str | None:
     except Exception as e:
         logger.error(f"failed to upload file ({path}) because: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload to the OctoPrint server.")
-
+@app.post("/select_file")
+def select_file(ip: str, api_key: str, name: str):
+    post_select_file(ip=ip, api_key=api_key, name=name)
 def is_valid_path(path: str) -> bool:
     return os.path.exists(path) and os.path.isfile(path)
 

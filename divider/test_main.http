@@ -78,7 +78,8 @@ POST {{baseUrl}}/upload?ip={{ip}}&api_key={{apiKey}}&path={{path}}
 DELETE {{baseUrl}}/delete?ip={{ip}}&api_key={{apiKey}}&name=demo.gcode
 Accept: application/json
 
-
+###
+POST {{baseUrl}}/select_file?ip={{ip}}&api_key={{apiKey}}&name=3dbenchy_ender.gcode
 
 
 

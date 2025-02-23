@@ -5,19 +5,36 @@ This module provides functions to interact with the files of OctoPrint.
 """
 import json
 import os
-
 import requests
+
+from rich import print
 from requests_toolbelt.multipart import encoder
+
 from logging_config import logger
 
-def _select_file(ip: str, api_key: str, name: str):
+def post_select_file(ip: str, api_key: str, name: str):
     octoprint_url: str = f"http://{ip}/api"
-    url = f"{octoprint_url}/files"
+    url = f"{octoprint_url}/local/{name}"
     headers = {
         'X-Api-Key': api_key,
         'Content-Type': 'application/json'
     }
+    data = {
+        "command": "select",
+        "print": "true"
+    }
 
+
+    files_json = get_all_files(ip=ip, api_key=api_key)
+    if files_json:
+        list_json_files = files_json["files"]
+        display_names = [file["display"] for file in list_json_files]
+        if name in display_names:
+            response = requests.post(url=url, headers=headers, json=data)
+            logger.info(f"selected file ({name}) is ok")
+            return response
+        else:
+            return "error"
 def get_all_files(ip: str, api_key: str) -> json:
     """
     Retrieves all file of the printer.
@@ -115,3 +132,6 @@ def log_end_upload(monitor):
     :param monitor: The MultipartEncoderMonitor object.
     """
     logger.info(f"Uploaded {monitor.bytes_read} of {monitor.len}")
+
+# if __name__ == '__main__':
+#     select_file(ip="10.0.0.254", api_key="hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI", name="3dbenchy.gcode")

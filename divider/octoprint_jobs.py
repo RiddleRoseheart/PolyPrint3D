@@ -30,6 +30,18 @@ def get_status_job(ip: str, api_key: str) -> json:
     else:
         # Log an error if the request failed
         logger.error(f"Failed to retrieve connection info: {response.status_code} - {response.text}")
+def print_selected_job(ip: str, api_key: str):
+    octoprint_url: str = f"http://{ip}/api"
+    url = f"{octoprint_url}/job"
+    headers = {
+        'X-Api-Key': api_key,
+        'Content-Type': 'application/json'
+    }
+    data = {
+        "command": "start"
+    }
+    response = requests.post(url=url, headers=headers, json=data)
+    return  response
 
 def cancel_print_job(ip: str, api_key: str) -> bool:
     """
@@ -56,3 +68,6 @@ def cancel_print_job(ip: str, api_key: str) -> bool:
         # Log an error if the request failed
         logger.error(f"Failed to cancel print job: {response.status_code} - {response.text}")
         return False
+
+if __name__ == '__main__':
+    print_selected_job(ip="10.0.0.254", api_key="hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI")
