@@ -7,7 +7,7 @@ as well as retrieve connection information.
 
 import requests
 import json
-from logging_config import logger
+from divider.logging_config import logger
 
 def connect_octoprint(ip: str, api_key: str) -> None:
     """
@@ -39,6 +39,7 @@ def connect_octoprint(ip: str, api_key: str) -> None:
         else:
             # Log an error if the connection failed
             logger.error(f"Failed to start connection: {response.status_code} - {response.text}")
+
 def disconnect_octoprint(ip: str, api_key: str) -> None:
     """
     Disconnects from the OctoPrint server.
@@ -65,6 +66,7 @@ def disconnect_octoprint(ip: str, api_key: str) -> None:
         else:
             # Log an error if the disconnection failed
             logger.error(f"Failed to close connection: {response.status_code} - {response.text}")
+
 def get_connection(ip: str, api_key: str) -> json:
     """
     Retrieves connection information from the OctoPrint server.
@@ -129,6 +131,7 @@ def is_octoprint_server(ip: str, api_key: str) -> bool:
         # Log an error if there was a connection error
         logger.error(f"Failed to connect to IP {ip}: {e}")
         return False
+
 def is_octoprint_connected(ip: str, api_key: str) -> bool:
     """
     Checks if the OctoPrint server is connected.

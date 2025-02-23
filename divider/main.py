@@ -5,7 +5,7 @@ from logging_config import logger
 from octoprint_connector import *
 from octoprint_info_retriever import *
 from octoprint_jobs import *
-from ocotprint_files import *
+from octoprint_files import *
 
 # Initialize FastAPI app with metadata
 app = FastAPI(
@@ -393,7 +393,7 @@ def all_files(ip: str, api_key: str):
         "description": "File deleted successfully",
         "content": {
             "application/json": {
-                "example": {"message": "File demo.gcode deleted successfully."}
+                "example": {"message": "File test.gcode deleted successfully."}
             }
         }
     },
@@ -409,7 +409,7 @@ def all_files(ip: str, api_key: str):
         "description": "File not found",
         "content": {
             "application/json": {
-                "example": {"detail": "File demo.gcode not found."}
+                "example": {"detail": "File test.gcode not found."}
             }
         }
     },
@@ -417,7 +417,7 @@ def all_files(ip: str, api_key: str):
         "description": "Conflict",
         "content": {
             "application/json": {
-                "example": {"detail": "File demo.gcode is currently being printed."}
+                "example": {"detail": "File test.gcode is currently being printed."}
             }
         }
     },
@@ -425,7 +425,7 @@ def all_files(ip: str, api_key: str):
         "description": "Internal server error",
         "content": {
             "application/json": {
-                "example": {"detail": "Failed to delete file demo.gcode from OctoPrint server."}
+                "example": {"detail": "Failed to delete file test.gcode from OctoPrint server."}
             }
         }
     }
@@ -453,7 +453,7 @@ def delete_file_endpoint(ip: str, api_key: str, name: str):
         "description": "File uploaded successfully",
         "content": {
             "application/json": {
-                "example": {"message": "file: C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode is uploaded"}
+                "example": {"message": "file: C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\test.gcode is uploaded"}
             }
         }
     },

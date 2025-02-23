@@ -170,6 +170,6 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-divider/demo.gcode
+divider/test.gcode
 
 divider/test.py
