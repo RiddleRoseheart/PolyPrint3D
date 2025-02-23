@@ -30,7 +30,6 @@ def _get_current_status(ip: str, api_key: str) -> json:
     else:
         # Log an error if the request failed
         logger.error(f"Failed to retrieve connection info: {response.status_code} - {response.text}")
-
 def _get_current_state(ip: str, api_key: str) -> json:
     """
     Retrieves the current state from the OctoPrint server.
@@ -42,7 +41,6 @@ def _get_current_state(ip: str, api_key: str) -> json:
     printer_status: json = _get_current_status(ip=ip, api_key=api_key)
     states: json = printer_status['state']
     return states
-
 def _get_current_temperature(ip: str, api_key: str) -> json:
     """
     Retrieves the current temperature from the OctoPrint server.
@@ -66,7 +64,6 @@ def get_current_flags(ip: str, api_key: str) -> json:
     states: json = _get_current_state(ip=ip, api_key=api_key)
     flags: json = states['flags']
     return flags
-
 def get_current_temperature_bed(ip: str, api_key: str) -> float:
     """
     Retrieves the current bed temperature from the OctoPrint server.
@@ -78,7 +75,6 @@ def get_current_temperature_bed(ip: str, api_key: str) -> float:
     temperature: json = _get_current_temperature(ip=ip, api_key=api_key)
     bed_temperature = temperature['bed']
     return bed_temperature['actual']
-
 def get_current_temperature_tool0(ip: str, api_key: str) -> float:
     """
     Retrieves the current tool0 temperature from the OctoPrint server.
@@ -90,7 +86,6 @@ def get_current_temperature_tool0(ip: str, api_key: str) -> float:
     temperature: json = _get_current_temperature(ip=ip, api_key=api_key)
     tool0_temperature = temperature['tool0']
     return tool0_temperature['actual']
-
 def get_target_temperature_bed(ip: str, api_key: str) -> float:
     """
     Retrieves the target bed temperature from the OctoPrint server.
@@ -102,7 +97,6 @@ def get_target_temperature_bed(ip: str, api_key: str) -> float:
     temperature: json = _get_current_temperature(ip=ip, api_key=api_key)
     bed_temperature = temperature['bed']
     return bed_temperature['target']
-
 def get_target_temperature_tool0(ip: str, api_key: str) -> float:
     """
     Retrieves the target tool0 temperature from the OctoPrint server.
@@ -114,7 +108,6 @@ def get_target_temperature_tool0(ip: str, api_key: str) -> float:
     temperature: json = _get_current_temperature(ip=ip, api_key=api_key)
     tool0_temperature = temperature['tool0']
     return tool0_temperature['target']
-
 def get_version(ip: str, api_key: str) -> json:
     """
     Retrieves connection information from the OctoPrint server version + state.

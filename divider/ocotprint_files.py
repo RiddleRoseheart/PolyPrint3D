@@ -10,6 +10,14 @@ import requests
 from requests_toolbelt.multipart import encoder
 from logging_config import logger
 
+def _select_file(ip: str, api_key: str, name: str):
+    octoprint_url: str = f"http://{ip}/api"
+    url = f"{octoprint_url}/files"
+    headers = {
+        'X-Api-Key': api_key,
+        'Content-Type': 'application/json'
+    }
+
 def get_all_files(ip: str, api_key: str) -> json:
     """
     Retrieves all file of the printer.
@@ -33,7 +41,6 @@ def get_all_files(ip: str, api_key: str) -> json:
     else:
         # Log an error if the request failed
         logger.error(f"Failed to retrieve connection info: {response.status_code} - {response.text}")
-
 def upload_gcode_file(ip: str, api_key: str, path: str):
     """
     Uploads a G-code file to the OctoPrint server.
@@ -70,7 +77,6 @@ def upload_gcode_file(ip: str, api_key: str, path: str):
     except FileExistsError:
         # Log a warning if the provided path is not a file
         logger.warning(f"this is not a file {os.path.basename(path)}")
-
 def delete_file(ip: str, api_key: str, name: str):
     """
     Deletes a file from the OctoPrint server.
