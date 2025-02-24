@@ -1,6 +1,7 @@
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 from backend.routes import file_routes, slicer_routes, auth_routes
+from backend.routes.printer import bp as printer_bp
 from pathlib import Path
 import os
 from backend.database import init_db, db
@@ -50,16 +51,16 @@ def create_app():
 
 #todo 
     # Configure app
-    app.config['SECRET_KEY'] = 'your-secret-key'  # Change this!
+    app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
-
+   
 
     # Register blueprints
     # app.register_blueprint(api.bp)
     app.register_blueprint(file_routes.bp)
     app.register_blueprint(slicer_routes.bp)
     app.register_blueprint(auth_routes.bp)
-
+    app.register_blueprint(printer_bp)
 
     @app.route('/')
     def serve():

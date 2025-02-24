@@ -1,4 +1,3 @@
-# backend/services/printer/job_service.py
 from .base_service import BasePrinterService
 from typing import Dict, List
 import uuid

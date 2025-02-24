@@ -1,4 +1,3 @@
-# backend/services/printer/base_service.py
 from typing import Dict
 import logging
 import requests
