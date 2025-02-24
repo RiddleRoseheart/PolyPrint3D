@@ -12,12 +12,12 @@ bp = Blueprint('slicer', __name__)
 slicer_service = None
 
 @bp.record_once
-def on_register(state):
+def configure_blueprint(state):
     """Initialize slicer_service when blueprint is registered"""
     global slicer_service
     slicer_service = SlicerService(
-        state.app.config['OUTPUT_FOLDER'],
-        state.app.config['CONFIG_PATH']
+        output_dir=state.app.config['OUTPUT_FOLDER'],
+        config_path=state.app.config['CONFIG_PATH']
     )
 
 def create_print_request_response(request) -> Dict:
@@ -116,3 +116,25 @@ def cleanup_print_request(request_id: str) -> Tuple[Dict, int]:
     except Exception as e:
         logger.error(f"Cleanup error: {str(e)}")
         return jsonify({'error': 'Cleanup failed'}), 500
+    
+@bp.route('/api/slicer/materials', methods=['GET'])
+@login_required
+def get_materials() -> Tuple[Dict, int]:
+    """Get available materials and their properties"""
+    try:
+        materials = slicer_service.get_available_materials()
+        return jsonify(materials)
+    except Exception as e:
+        logger.error(f"Error getting materials: {str(e)}")
+        return jsonify({'error': "Failed to get materials"}), 500
+
+@bp.route('/api/slicer/colors', methods=['GET'])
+@login_required
+def get_colors() -> Tuple[Dict, int]:
+    """Get available colors"""
+    try:
+        colors = slicer_service.get_available_colors()
+        return jsonify(colors)
+    except Exception as e:
+        logger.error(f"Error getting colors: {str(e)}")
+        return jsonify({'error': "Failed to get colors"}), 500
