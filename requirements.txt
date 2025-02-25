@@ -1,5 +1,6 @@
 flask
 flask-cors
+flask-mail
 werkzeug
 python-dotenv
 trimesh
@@ -16,5 +17,6 @@ SQLAlchemy
 marshmallow
 uuid
 typing-extensions
-logging
 datetime
+requests
+requests-toolbelt
