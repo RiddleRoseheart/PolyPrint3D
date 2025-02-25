@@ -1,9 +1,9 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
-from backend.services.printer_service import PrinterService
 from backend.database.models import UserRole
 from typing import Dict, Tuple
 import logging
+from backend.services import PrinterService
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('printer_management', __name__)

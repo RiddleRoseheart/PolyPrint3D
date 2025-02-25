@@ -1,5 +1,5 @@
 from .base_service import BasePrinterService
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 from datetime import datetime
 import requests
@@ -12,6 +12,16 @@ logger = logging.getLogger(__name__)
 class PrinterManagementService(BasePrinterService):
     """Service for managing printer registration and basic operations"""
 
+    def __init__(self, notification_service=None):
+        """
+        Initialize printer management service
+        
+        Args:
+            notification_service: Optional notification service
+        """
+        super().__init__()  
+        self.notification_service = notification_service
+        
     def verify_printer(self, ip: str, api_key: str) -> bool:
         """
         Verify if given IP is an OctoPrint server

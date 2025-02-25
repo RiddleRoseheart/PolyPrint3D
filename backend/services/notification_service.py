@@ -3,8 +3,9 @@ from flask_mail import Mail, Message
 from backend.database.models import User, PrintRequest
 import logging
 from flask import render_template
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
+from backend.database.models import UploadedFile
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +99,6 @@ class NotificationService:
     #TODO
     def _calculate_duration(self, print_request: PrintRequest) -> str:
         """Calculate print duration readable format"""
-        # Implement duration calculation based on your data model
-        # This is a placeholder implementation
         start_time = print_request.created_at
         end_time = datetime.now()
         duration_seconds = (end_time - start_time).total_seconds()

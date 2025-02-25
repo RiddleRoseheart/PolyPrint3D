@@ -16,7 +16,8 @@ slicer_service = None
 def configure_blueprint(state):
     """Initialize slicer_service when blueprint is registered"""
     global slicer_service
-    notification_service = NotificationService(current_app.extensions['mail'])
+    notification_service = NotificationService(state.app.extensions.get('mail'))
+    
     slicer_service = SlicerService(
         state.app.config['OUTPUT_FOLDER'],
         state.app.config['CONFIG_PATH'],

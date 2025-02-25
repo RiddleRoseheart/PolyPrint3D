@@ -8,6 +8,7 @@ from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User
 from backend.slicer.scripts.slicer import split_and_distribute_objects, slice_with_prusa_slicer
 from backend.slicer.scripts.file_manager import FileManager
 from backend.slicer.config.material_config import AVAILABLE_MATERIALS, AVAILABLE_COLORS
+from backend.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -217,37 +218,34 @@ class SlicerService:
             logger.error(f"Failed to update print request status: {str(e)}")
             raise
 
-    def _check_project_completion(self, print_request: PrintRequest):
+    def _check_project_completion(self, completed_request: PrintRequest):
         """
-    Check if all print requests for original file are complete
+        Check if all print requests for original file are complete
     
-    Args:
-        print_request: A completed print request
+        Args:
+            completed_request: A completed print request
         """
-    try:
-        # Get the original file
-        original_file = print_request.original_file
+        try:
+            original_file = completed_request.original_file
         
-        # Get all print requests for this original file
-        all_requests = PrintRequest.query.filter_by(
-            original_file_id=original_file.id
-        ).all()
+            # Get all print requests for this original file
+            all_requests = PrintRequest.query.filter_by(
+                original_file_id=original_file.id
+            ).all()
         
-        # Check if all print requests are completed
-        all_completed = all(req.state == "completed" for req in all_requests)
+            all_completed = all(req.state == "completed" for req in all_requests)
         
-        if all_completed:
-            logger.info(f"All print requests completed for file {original_file.id}")
+            if all_completed:
+                logger.info(f"All print requests completed for file {original_file.id}")
             
-            # Get the user who uploaded the file
-            user = original_file.user
+                user = original_file.user
             
-            if self.notification_service:
-                self.notification_service.send_print_project_completed(
-                    user.email,
-                    original_file,
-                    all_requests
-                )
+                if self.notification_service:
+                    self.notification_service.send_print_project_completed(
+                        user.email,
+                        original_file,
+                        all_requests
+                    )
                 
-    except Exception as e:
-        logger.error(f"Error checking project completion: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error checking project completion: {str(e)}")

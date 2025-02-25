@@ -2,16 +2,18 @@ from .management_service import PrinterManagementService
 from .connection_service import PrinterConnectionService
 from .file_service import PrinterFileService
 from .job_service import PrinterJobService
+from backend.services.notification_service import NotificationService 
 
 class PrinterService:
     """Main printer service that combines all sub-services"""
 
-    def __init__(self):
+    def __init__(self, notification_service=None):
         """Initialize all printer sub-services"""
-        self.management = PrinterManagementService()
+        self.management = PrinterManagementService(notification_service=notification_service)
         self.connection = PrinterConnectionService()
         self.files = PrinterFileService()
-        self.jobs = PrinterJobService()
+        self.jobs = PrinterJobService(notification_service=notification_service)  # Pass to job service if needed
+        self.notification = notification_service
 
     def __getattr__(self, name):
         """

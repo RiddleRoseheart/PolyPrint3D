@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app
 from flask_login import login_required
-from backend.services.printer_service import PrinterService
+from backend.services.printer import PrinterService
 from typing import Dict, Tuple
 import logging
 import os

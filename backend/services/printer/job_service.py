@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 class PrinterJobService(BasePrinterService):
     """Service for managing print jobs"""
+    
+    def __init__(self, notification_service=None):
+        self.notification_service = notification_service
 
     def get_job_status(self, printer_id: str) -> Dict:
         """
