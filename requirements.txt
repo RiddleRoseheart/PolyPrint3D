@@ -16,5 +16,4 @@ SQLAlchemy
 marshmallow
 uuid
 typing-extensions
-logging
 datetime
