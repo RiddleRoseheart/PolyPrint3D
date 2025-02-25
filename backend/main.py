@@ -6,8 +6,10 @@ from pathlib import Path
 import os
 from backend.database import init_db, db
 from flask_login import LoginManager 
+from flask_mail import Mail
 
 login_manager = LoginManager() 
+mail = Mail() 
 
 def init_login_manager(app):
     login_manager.init_app(app)
@@ -54,6 +56,13 @@ def create_app():
     app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
    
+# Configure Flask-Mail TODO .ENV!! & in production
+    app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
+    app.config['MAIL_PORT'] = 2525
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', 'f20c04086a57e8')
+    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', 'c3d5822dd84d40')
+    mail.init_app(app)
 
     # Register blueprints
     # app.register_blueprint(api.bp)

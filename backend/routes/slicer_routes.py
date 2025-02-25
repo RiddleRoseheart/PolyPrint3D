@@ -4,6 +4,7 @@ from backend.services.slicer_service import SlicerService
 from pathlib import Path
 import logging
 from typing import Dict, Tuple
+from backend.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('slicer', __name__)
@@ -15,9 +16,11 @@ slicer_service = None
 def configure_blueprint(state):
     """Initialize slicer_service when blueprint is registered"""
     global slicer_service
+    notification_service = NotificationService(current_app.extensions['mail'])
     slicer_service = SlicerService(
-        output_dir=state.app.config['OUTPUT_FOLDER'],
-        config_path=state.app.config['CONFIG_PATH']
+        state.app.config['OUTPUT_FOLDER'],
+        state.app.config['CONFIG_PATH'],
+        notification_service
     )
 
 def create_print_request_response(request) -> Dict:

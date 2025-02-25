@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class SlicerService:
     """Service for handling 3D model slicing operations with user permissions"""
     
-    def __init__(self, output_dir: str | Path, config_path: str | Path):
+    def __init__(self, output_dir: str | Path, config_path: str | Path, notification_service: NotificationService = None):
         """
         Initialize SlicerService
         
@@ -24,7 +24,7 @@ class SlicerService:
         """
         self.output_dir = Path(output_dir)
         self.config_path = Path(config_path)
-        
+        self.notification_service = notification_service
         # Initialize directories
         self._initialize_directories()
         
@@ -188,3 +188,66 @@ class SlicerService:
         """Get available colors and their hex codes"""
         return AVAILABLE_COLORS   
     
+    def update_print_request_status(self, request_id: str, status: str) -> PrintRequest:
+        """
+    Update print request status and check if project is complete
+    
+    Args:
+        request_id: ID of print request
+        status: New status value
+        
+    Returns:
+        Updated PrintRequest
+        """
+        try:
+            print_request = PrintRequest.query.get(request_id)
+            if not print_request:
+                raise ValueError("Print request not found")
+            
+            print_request.state = status
+            db.session.commit()
+        
+            if status == "completed":
+                self._check_project_completion(print_request)
+                
+            return print_request
+        
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to update print request status: {str(e)}")
+            raise
+
+    def _check_project_completion(self, print_request: PrintRequest):
+        """
+    Check if all print requests for original file are complete
+    
+    Args:
+        print_request: A completed print request
+        """
+    try:
+        # Get the original file
+        original_file = print_request.original_file
+        
+        # Get all print requests for this original file
+        all_requests = PrintRequest.query.filter_by(
+            original_file_id=original_file.id
+        ).all()
+        
+        # Check if all print requests are completed
+        all_completed = all(req.state == "completed" for req in all_requests)
+        
+        if all_completed:
+            logger.info(f"All print requests completed for file {original_file.id}")
+            
+            # Get the user who uploaded the file
+            user = original_file.user
+            
+            if self.notification_service:
+                self.notification_service.send_print_project_completed(
+                    user.email,
+                    original_file,
+                    all_requests
+                )
+                
+    except Exception as e:
+        logger.error(f"Error checking project completion: {str(e)}")
