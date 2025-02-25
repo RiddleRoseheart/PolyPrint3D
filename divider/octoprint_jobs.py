@@ -70,4 +70,5 @@ def cancel_print_job(ip: str, api_key: str) -> bool:
         return False
 
 if __name__ == '__main__':
-    print_selected_job(ip="10.0.0.254", api_key="hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI")
+    pass
+    # print_selected_job(ip="10.0.0.254", api_key="hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI")

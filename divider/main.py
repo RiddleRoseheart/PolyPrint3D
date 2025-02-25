@@ -491,6 +491,45 @@ def select_file(ip: str, api_key: str, name: str):
 def is_valid_path(path: str) -> bool:
     return os.path.exists(path) and os.path.isfile(path)
 
+@app.post("/job", responses={
+    200: {
+        "description": "Print job started successfully",
+        "content": {
+            "application/json": {
+                "example": {"message": "Print job started successfully."}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to start print job on OctoPrint server."}
+            }
+        }
+    }
+})
+def start_print_job(ip: str, api_key: str):
+    if not is_octoprint_server(ip, api_key):
+        raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
+    try:
+        response = print_selected_job(ip, api_key)
+        if response.status_code == 204:
+            return {"message": "Print job started successfully."}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to start print job on OctoPrint server.")
+    except Exception as e:
+        logger.error(f"Failed to start print job: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start print job on OctoPrint server.")
+
 import uvicorn
 
 if __name__ == "__main__":

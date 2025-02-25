@@ -81,6 +81,8 @@ Accept: application/json
 ###
 POST {{baseUrl}}/select_file?ip={{ip}}&api_key={{apiKey}}&name=3dbenchy_ender.gcode
 
+###
+GET {{ip}}/api/system/commands/core?ip={{ip}}&api_key={{apiKey}}
 
 
 

@@ -1,6 +1,6 @@
 """
-octoprint_files.py
 
+octoprint_files.py
 This module provides functions to interact with the files of OctoPrint.
 """
 import json
@@ -17,6 +17,14 @@ from divider.octoprint_errors import (
 )
 
 def post_select_file(ip: str, api_key: str, name: str):
+    """
+    Selects a file on the OctoPrint server.
+
+    :param ip: The IP address of the OctoPrint server.
+    :param api_key: The API key for authentication.
+    :param name: The name of the file to be selected.
+    :return: The response from the OctoPrint server.
+    """
     octoprint_url: str = f"http://{ip}/api"
     url = f"{octoprint_url}/local/{name}"
     headers = {
@@ -52,9 +60,10 @@ def post_select_file(ip: str, api_key: str, name: str):
     except requests.exceptions.RequestException as req_err:
         logger.warning(f'Request error occurred: {req_err} in post_select_file')
     return None
+
 def get_all_files(ip: str, api_key: str) -> json:
     """
-    Retrieves all file of the printer.
+    Retrieves all files from the OctoPrint server.
 
     :param ip: The IP address of the OctoPrint server.
     :param api_key: The API key for authentication.
@@ -79,6 +88,7 @@ def get_all_files(ip: str, api_key: str) -> json:
     except requests.exceptions.RequestException as req_err:
         logger.warning(f'Request error occurred: {req_err} in get_all_files')
     return None
+
 def upload_gcode_file(ip: str, api_key: str, path: str):
     """
     Uploads a G-code file to the OctoPrint server.
@@ -86,6 +96,7 @@ def upload_gcode_file(ip: str, api_key: str, path: str):
     :param ip: The IP address of the OctoPrint server.
     :param api_key: The API key for authentication.
     :param path: The local path to the G-code file to be uploaded.
+    :return: JSON response from the OctoPrint server.
     """
     octoprint_url: str = f"http://{ip}/api"
     url = f"{octoprint_url}/files/local"
@@ -117,6 +128,7 @@ def upload_gcode_file(ip: str, api_key: str, path: str):
     except FileExistsError:
         logger.warning(f"this is not a file {os.path.basename(path)}")
     return None
+
 def delete_file(ip: str, api_key: str, name: str):
     """
     Deletes a file from the OctoPrint server.
@@ -124,6 +136,7 @@ def delete_file(ip: str, api_key: str, name: str):
     :param ip: The IP address of the OctoPrint server.
     :param api_key: The API key for authentication.
     :param name: The name of the file to be deleted.
+    :return: The response from the OctoPrint server.
     """
     octoprint_url: str = f"http://{ip}/api"
     url = f"{octoprint_url}/files/local/{name}"
