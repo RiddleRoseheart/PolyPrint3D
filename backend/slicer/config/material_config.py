@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
- 
+
 @dataclass
 class MaterialConfig:
     name: str
@@ -10,7 +10,7 @@ class MaterialConfig:
     first_layer_bed_temperature: int
     cost_per_gram: float
     density: float
- 
+
 @dataclass
 class PrintObject:
     object_id: int
@@ -19,12 +19,12 @@ class PrintObject:
     color: str
     bounding_box: Tuple[float, float, float]
     face_count: int
- 
+
     @property
     def id(self):
         """Alias for object_id for backwards compatibility"""
         return self.object_id
- 
+
 # Available materials with their printing parameters
 AVAILABLE_MATERIALS = {
     'PLA': MaterialConfig(
@@ -64,7 +64,7 @@ AVAILABLE_MATERIALS = {
         density=1.21
     )
 }
- 
+
 def __init__(self, object_id, volume, material, color, bounding_box, face_count):
     self.id = object_id
     self.volume = volume
@@ -72,7 +72,7 @@ def __init__(self, object_id, volume, material, color, bounding_box, face_count)
     self.color = color
     self.bounding_box = bounding_box
     self.face_count = face_count
- 
+
 # Available colors with their hex codes and names
 AVAILABLE_COLORS = {
     'Black': '#000000',
@@ -86,7 +86,7 @@ AVAILABLE_COLORS = {
     'Gray': '#808080',
     'Natural': '#FFF2EC'
 }
- 
+
 @dataclass
 class ObjectConfig:
     id: int
@@ -95,6 +95,7 @@ class ObjectConfig:
     color: str
     bounding_box: Tuple[float, float, float]
     face_count: int
+
  
 def get_material_names() -> List[str]:
     """Get list of available material names"""
@@ -105,6 +106,7 @@ def get_color_names() -> List[str]:
     return list(AVAILABLE_COLORS.keys())
  
 def create_object_config(object_id: int, volume: float,
+
                         bounding_box: Tuple[float, float, float],
                         face_count: int,
                         material: str = 'PLA',
@@ -114,7 +116,7 @@ def create_object_config(object_id: int, volume: float,
         raise ValueError(f"Invalid material: {material}")
     if color not in AVAILABLE_COLORS:
         raise ValueError(f"Invalid color: {color}")
-       
+
     return ObjectConfig(
         id=object_id,
         volume=volume,
@@ -123,16 +125,18 @@ def create_object_config(object_id: int, volume: float,
         bounding_box=bounding_box,
         face_count=face_count
     )
- 
+
 def generate_material_config(material_name: str, color_name: str) -> Dict[str, str]:
     """Generate configuration dictionary for PrusaSlicer"""
     if material_name not in AVAILABLE_MATERIALS:
         raise ValueError(f"Invalid material: {material_name}")
     if color_name not in AVAILABLE_COLORS:
         raise ValueError(f"Invalid color: {color_name}")
+
        
     material = AVAILABLE_MATERIALS[material_name]
    
+
     return {
         'filament_type': material.name,
         'filament_colour': AVAILABLE_COLORS[color_name],
@@ -142,7 +146,7 @@ def generate_material_config(material_name: str, color_name: str) -> Dict[str, s
         'first_layer_bed_temperature': str(material.first_layer_bed_temperature),
         'filament_density': str(material.density)
     }
- 
+
 def print_available_options():
     """Print all available materials and colors"""
     print("\nAvailable Materials:")
@@ -153,7 +157,7 @@ def print_available_options():
         print(f"  Bed Temperature: {config.bed_temperature}°C")
         print(f"  Cost per gram: ${config.cost_per_gram:.2f}")
         print()
-       
+
     print("\nAvailable Colors:")
     print("-" * 20)
     for color_name, hex_code in AVAILABLE_COLORS.items():
