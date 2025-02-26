@@ -20,4 +20,5 @@ typing-extensions
 datetime
 requests
 requests-toolbelt
-
+flask-socketio 
+eventlet
