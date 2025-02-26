@@ -19,11 +19,14 @@ class PrintObject:
     color: str
     bounding_box: Tuple[float, float, float]
     face_count: int
+    weight: float = 0.0
+    price: float = 0.0
 
     @property
     def id(self):
         """Alias for object_id for backwards compatibility"""
         return self.object_id
+
 
 # Available materials with their printing parameters
 AVAILABLE_MATERIALS = {
@@ -158,3 +161,53 @@ def print_available_options():
     print("-" * 20)
     for color_name, hex_code in AVAILABLE_COLORS.items():
         print(f"{color_name}: {hex_code}")
+
+def calculate_price(obj_volume, material_name, price_per_gram=0.02):
+    """
+    Calculate the price of an object based on its volume and material.
+    
+    Parameters:
+    - obj_volume: Volume of the object in mm³
+    - material_name: Material name (must be in AVAILABLE_MATERIALS)
+    - price_per_gram: Price in euros per gram of material (default: 0.02)
+    
+    Returns:
+    - float: Price in euros
+    """
+    # Get material density from the AVAILABLE_MATERIALS dictionary
+    if material_name not in AVAILABLE_MATERIALS:
+        raise ValueError(f"Invalid material: {material_name}")
+    
+    material_density = AVAILABLE_MATERIALS[material_name].density
+    
+    # Calculate weight in grams (volume in mm³ * density in g/cm³ / 1000)
+    # Volume is in mm³, but density is in g/cm³, so we need to convert
+    # 1 cm³ = 1000 mm³, so divide by 1000 to get cm³
+    weight_grams = obj_volume * material_density / 1000
+    
+    # Calculate price
+    price_euros = weight_grams * price_per_gram
+    
+    return price_euros, weight_grams
+
+####################################################################################################
+# Printer's Build Volume
+BUILD_VOLUME = (250, 210, 210)  # (X, Y, Z)
+
+class Printer:
+    def __init__(self, printer_id, name, material, color, build_volume=BUILD_VOLUME):
+        self.printer_id = printer_id
+        self.name = name
+        self.material = material
+        self.color = color
+        self.build_volume = build_volume
+
+# Add function to get available printer configurations
+def get_available_printers():
+    """Return list of configured printers with their materials and colors"""
+    return [
+        Printer(1, "Printer 1", "PLA", "Black"),
+        Printer(2, "Printer 2", "PLA", "White"),
+        Printer(3, "Printer 3", "PETG", "Natural"),
+        Printer(4, "Printer 4", "TPU", "Black")
+    ]
