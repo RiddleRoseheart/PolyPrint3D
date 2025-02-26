@@ -39,6 +39,8 @@ class PrintRequest(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
     printer_id = db.Column(db.String(36), db.ForeignKey('printer.id'))
+    weight= db.Column(db.Float)
+    price = db.Column(db.Float)
     
     # Relationships
     original_file = db.relationship('UploadedFile', back_populates='print_requests')
@@ -66,6 +68,7 @@ class Filament(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     print_request_id = db.Column(db.String(36), db.ForeignKey('print_request.id'), nullable=False)
     name = db.Column(db.String(255), nullable=False)
+    price_per_gram = db.Column(db.Float, nullable=False)
     
     # Relationships
     print_request = db.relationship('PrintRequest', back_populates='filaments')
@@ -79,6 +82,7 @@ class Color(db.Model):
     
     id = db.Column(db.String(36), primary_key=True)
     name = db.Column(db.String(255), nullable=False)
+    hex_code = db.Column(db.String(7), nullable=False) #availbale colors
     #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
     
     # Relationships
@@ -90,6 +94,7 @@ class Material(db.Model):
     
     id = db.Column(db.String(36), primary_key=True)
     name = db.Column(db.String(255), nullable=False)
+    density = db.Column(db.Float, nullable=False)
     #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
     
     # Relationships
