@@ -31,7 +31,7 @@ class PrintRequest(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     file_path = db.Column(db.String(255), nullable=False)
     original_file_id = db.Column(db.String(36), db.ForeignKey('uploaded_file.id'), nullable=False)
-    filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)  # Link to Filament
+    #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)  
     dimension = db.Column(db.String(255)) # Build volume dimensions
     filling = db.Column(db.Integer)       # Infill percentage
     layer_height = db.Column(db.Float)    # Layer height in mm
@@ -69,11 +69,14 @@ class Filament(db.Model):
     print_request_id = db.Column(db.String(36), db.ForeignKey('print_request.id'), nullable=False)
     name = db.Column(db.String(255), nullable=False)
     price_per_gram = db.Column(db.Float, nullable=False)
-    
+    color_id = db.Column(db.String(36), db.ForeignKey('color.id'), nullable=True)
+    material_id = db.Column(db.String(36), db.ForeignKey('material.id'), nullable=True)
+    printer_id = db.Column(db.String(36), db.ForeignKey('printer.id'), nullable=True)
+      
     # Relationships
     print_request = db.relationship('PrintRequest', back_populates='filaments')
-    color = db.relationship('Color', back_populates='filament', uselist=False)
-    material = db.relationship('Material', back_populates='filament', uselist=False)
+    color = db.relationship('Color', back_populates='filaments', uselist=False)
+    material = db.relationship('Material', back_populates='filaments', uselist=False)
     printer = db.relationship('Printer', back_populates='filaments')
      
 class Color(db.Model):
@@ -86,7 +89,7 @@ class Color(db.Model):
     #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
     
     # Relationships
-    filament = db.relationship('Filament', back_populates='color')
+    filaments = db.relationship('Filament', back_populates='color')
 
 class Material(db.Model):
     """Material types for filaments"""
@@ -98,7 +101,7 @@ class Material(db.Model):
     #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
     
     # Relationships
-    filament = db.relationship('Filament', back_populates='material')
+    filaments = db.relationship('Filament', back_populates='material')
 
 class User(db.Model, UserMixin):
     """User model with authentication and role management"""

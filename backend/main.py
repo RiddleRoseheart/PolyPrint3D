@@ -7,6 +7,8 @@ import os
 from backend.database import init_db, db
 from flask_login import LoginManager 
 from flask_mail import Mail
+from backend.utils.dev_data import create_test_data
+from backend.database.models import User
 
 login_manager = LoginManager() 
 mail = Mail() 
@@ -29,9 +31,8 @@ def create_app():
             "origins": ["http://localhost:3000"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
-            "supports_credentials": True
         }
-    })
+    }, supports_credentials=True)
     
     #initialize extensions
     #init_oauth(app)
@@ -41,10 +42,11 @@ def create_app():
     # Create database tables
     with app.app_context():
         db.create_all()
+        create_test_data() #TODO
     
     
     # Configure upload folder
-    app.config['UPLOAD_FOLDER'] = Path('backend/uploads')
+    app.config['UPLOAD_FOLDER'] = Path(os.path.abspath('uploads'))
     app.config['OUTPUT_FOLDER'] = Path('backend/output')
     app.config['CONFIG_PATH'] = Path('backend/slicer/config/config.ini')
 
@@ -77,6 +79,7 @@ def create_app():
         return send_from_directory('../frontend/', 'index.html')
     return app
 
+()
 app = create_app()
 
 if __name__ == '__main__':
