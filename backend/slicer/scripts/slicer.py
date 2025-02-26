@@ -4,12 +4,13 @@ import subprocess
 from pathlib import Path
 import numpy as np
 import sys
-
+ 
 # Add slicer directory to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 slicer_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(slicer_dir)
 
+ 
 from scripts.file_manager import FileManager
 from config.material_config import MaterialConfig, PrintObject, get_material_names, get_color_names, Printer, get_available_printers, calculate_price
 from config.env_config import load_config
@@ -21,19 +22,23 @@ def split_disconnected_components(mesh):
     """
     Split mesh into naturally disconnected components without cutting through objects.
     Only separates objects that are physically disconnected from each other.
+
     
     Parameters:
     - mesh: trimesh object
     
+
     Returns:
     - list of trimesh objects
     """
     # Use trimesh's built-in split function with only_watertight=False to preserve non-watertight parts
     components = mesh.split(only_watertight=False)
-    
+
+   
     # Filter out invalid components (those with too few vertices)
     valid_components = [comp for comp in components if len(comp.vertices) >= 4]
-    
+   
+
     return valid_components
 
 def check_object_fits(obj, build_volume):
@@ -51,7 +56,7 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
     scene = trimesh.Scene()
     x_max, y_max, z_max = build_volume
     unplaced_objects = []
-    
+
     # Filter and sort objects
     placeable_objects = []
     for obj in objects:
@@ -61,31 +66,33 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
             placeable_objects.append(obj)
         else:
             unplaced_objects.append(obj)
-    
+
     # Sort by base area for better packing
     placeable_objects.sort(
         key=lambda obj: obj.bounding_box.extents[0] * obj.bounding_box.extents[1],
         reverse=True
     )
-    
+
+   
     x_pos, y_pos = 0, 0
     max_height_in_row = 0
-    
+   
     for obj in placeable_objects:
         bbox = obj.bounding_box
         width, depth, height = bbox.extents
-        
+       
+
         # Check if we need to move to next row
         if x_pos + width + padding > x_max:
             x_pos = 0
             y_pos += max_height_in_row + padding
             max_height_in_row = 0
-        
+
         # Check if object fits in Y direction
         if y_pos + depth + padding > y_max:
             unplaced_objects.append(obj)
             continue
-        
+
         # Create a copy and place it
         obj_copy = obj.copy()
         translation = [
@@ -94,14 +101,16 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
             0  # Place directly on the build plate
         ]
         obj_copy.apply_translation(translation)
-        
+
+       
         # Update position tracking
         x_pos += width + padding
         max_height_in_row = max(max_height_in_row, depth)
-        
+       
         scene.add_geometry(obj_copy)
-    
+   
     return scene, unplaced_objects
+ 
 
 def setup_object_configurations(components):
     """
@@ -117,6 +126,7 @@ def setup_object_configurations(components):
     
     print("\nAvailable Printer Configurations:")
     print("-" * 30)
+    
     for printer in printers:
         print(f"Printer {printer.printer_id}: {printer.material} - {printer.color}")
     
@@ -125,17 +135,19 @@ def setup_object_configurations(components):
     print("\nDetected Objects:")
     print("-" * 40)
     
+
     for i, comp in enumerate(components, 1):
         print(f"\nObject {i}:")
         print(f"  Volume: {comp.volume:.2f} mm³")
         print(f"  Size: {tuple(comp.bounding_box.extents)}")
-        
+
         # Material selection
         while True:
             print(f"\nAvailable materials: {available_materials}")
             material = input(f"Choose material for Object {i}: ").strip().upper()
             if material in available_materials:
                 break
+
             print("Invalid material! Please choose from available printer materials.")
         
         # Color selection - show only colors available for selected material
@@ -153,7 +165,7 @@ def setup_object_configurations(components):
         
         # Calculate price based on volume and material
         price, weight = calculate_price(comp.volume, material)
-        
+
         config = PrintObject(
             object_id=i,
             volume=comp.volume,
@@ -165,6 +177,7 @@ def setup_object_configurations(components):
             price=price
         )
         
+        # Print configuration summary
         print(f"\nConfiguration for Object {i}:")
         print(f"  Material: {config.material}")
         print(f"  Color: {config.color}")
@@ -184,6 +197,7 @@ def split_and_distribute_objects(input_path, file_manager, job_name, build_volum
     """Splits an STL into naturally separated objects and distributes them by material/color."""
     print("Loading STL file...")
     mesh = trimesh.load_mesh(input_path)
+
     
     print("Splitting into components...")
     objects = split_disconnected_components(mesh)
@@ -192,6 +206,7 @@ def split_and_distribute_objects(input_path, file_manager, job_name, build_volum
         print("No valid objects found in the STL file.")
         return []
 
+    # Filter objects
     filtered_objects = [
         obj for obj in objects 
         if obj.volume >= volume_threshold and len(obj.faces) >= min_faces
@@ -282,8 +297,7 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
     
     # Ensure output directory exists
     local_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Updated command with correct profile names
+
     cmd = [
         prusa_path,
         str(stl_path),
@@ -292,12 +306,13 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
         "-g",  # Short form of --export-gcode
         "--output", str(local_path)
     ]
-    
+
     success = False
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         print(f"Successfully sliced {stl_path} for printer {printer.printer_id}")
-        
+
+        # Upload to server if file exists and is not empty
         if local_path.exists() and local_path.stat().st_size > 0:
             with open(local_path, 'rb') as f:
                 file_manager.save_file(f.read(), remote_path)
@@ -305,7 +320,7 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
             success = True
         else:
             print(f"Warning: G-code file not found or empty: {local_path}")
-                
+
     except subprocess.CalledProcessError as e:
         print(f"Error slicing {stl_path}: {e}")
         if e.output:
@@ -316,8 +331,10 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
         print("PrusaSlicer executable not found at:", prusa_path)
     except Exception as e:
         print(f"Error during slicing: {e}")
+
     
     return success
+
 
 if __name__ == "__main__":
     try:
@@ -351,7 +368,7 @@ if __name__ == "__main__":
 
         if grouped_files:
             print(f"\nGenerated {len(grouped_files)} STL files")
-            
+
             # Slice files
             print("\nSlicing files...")
             slicing_success = True
@@ -365,7 +382,7 @@ if __name__ == "__main__":
                 ):
                     slicing_success = False
                     print(f"Warning: Failed to slice {file_info['path']}")
-            
+
             if slicing_success:
                 print("\nProcessing complete! All files were successfully processed.")
             else:

@@ -71,9 +71,37 @@ export const deletePrintRequest = async (requestId) => {
     }
 };
 
+/**
+ * Get available materials
+ * @returns {Promise<Object>} Materials and their properties
+ */
+export const getMaterials = async () => {
+    try {
+        const response = await axiosInstance.get('/api/slicer/materials');
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Get available colors
+ * @returns {Promise<Object>} Colors and their hex codes
+ */
+export const getColors = async () => {
+    try {
+        const response = await axiosInstance.get('/api/slicer/colors');
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
 export default {
     sliceSTLFile,
     getPrintRequests,
     getPrintRequest,
-    deletePrintRequest
+    deletePrintRequest,
+    getMaterials,
+    getColors
 };

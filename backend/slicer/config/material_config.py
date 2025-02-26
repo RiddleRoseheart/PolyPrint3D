@@ -99,15 +99,17 @@ class ObjectConfig:
     bounding_box: Tuple[float, float, float]
     face_count: int
 
+ 
 def get_material_names() -> List[str]:
     """Get list of available material names"""
     return list(AVAILABLE_MATERIALS.keys())
-
+ 
 def get_color_names() -> List[str]:
     """Get list of available color names"""
     return list(AVAILABLE_COLORS.keys())
+ 
+def create_object_config(object_id: int, volume: float,
 
-def create_object_config(object_id: int, volume: float, 
                         bounding_box: Tuple[float, float, float],
                         face_count: int,
                         material: str = 'PLA',
@@ -117,7 +119,7 @@ def create_object_config(object_id: int, volume: float,
         raise ValueError(f"Invalid material: {material}")
     if color not in AVAILABLE_COLORS:
         raise ValueError(f"Invalid color: {color}")
-        
+
     return ObjectConfig(
         id=object_id,
         volume=volume,
@@ -133,9 +135,11 @@ def generate_material_config(material_name: str, color_name: str) -> Dict[str, s
         raise ValueError(f"Invalid material: {material_name}")
     if color_name not in AVAILABLE_COLORS:
         raise ValueError(f"Invalid color: {color_name}")
-        
+
+       
     material = AVAILABLE_MATERIALS[material_name]
-    
+   
+
     return {
         'filament_type': material.name,
         'filament_colour': AVAILABLE_COLORS[color_name],
@@ -156,7 +160,7 @@ def print_available_options():
         print(f"  Bed Temperature: {config.bed_temperature}°C")
         print(f"  Cost per gram: ${config.cost_per_gram:.2f}")
         print()
-        
+
     print("\nAvailable Colors:")
     print("-" * 20)
     for color_name, hex_code in AVAILABLE_COLORS.items():

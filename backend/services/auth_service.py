@@ -203,7 +203,3 @@ class AuthService:
         """Get all users (admin function)"""
         return User.query.all()
     
-    @staticmethod
-    def is_admin(user: User) -> bool:
-    """Check if user has admin role"""
-    return user.role == UserRole.ADMIN.value
