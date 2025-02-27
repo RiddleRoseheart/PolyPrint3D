@@ -15,7 +15,7 @@ const UserProfile = ({ user }) => {
                 <Button
                     variant="contained"
                     component={Link}
-                    to="/"
+                    to="/upload"
                     sx={{ mt: 2 }}
                 >
                     Start Printing

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { register, login, logout, getCurrentUser } from '../api/endpoints/authEndpoints';
+import { register, login } from '../api/endpoints/authEndpoints';
 import { handleError } from '../utils/errorHandler';
 import {
     Container,
@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
-const AuthPage = ({ user, setUser }) => {
+const AuthPage = ({ setUser }) => {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -44,18 +44,6 @@ const AuthPage = ({ user, setUser }) => {
         } catch (error) {
             handleError(error);
             setError('Registration failed. Please try again.');
-        }
-    };
-
-    const handleLogout = async () => {
-        try {
-            await logout();
-            setUser(null);
-            setError(null);
-            navigate('/Landing');
-        } catch (error) {
-            handleError(error);
-            setError('Logout failed. Please try again.');
         }
     };
 
@@ -116,12 +104,6 @@ const AuthPage = ({ user, setUser }) => {
                         >
                             {isLogin ? 'Switch to Register' : 'Switch to Login'}
                         </Button>
-
-                        {user && (
-                            <Button variant="contained" color="error" fullWidth onClick={handleLogout}>
-                                Logout
-                            </Button>
-                        )}
                     </Box>
                 </form>
 
