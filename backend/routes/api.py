@@ -1,4 +1,5 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
+from flask_login import login_required, current_user
 from pathlib import Path
 from werkzeug.utils import secure_filename
 import uuid
@@ -10,6 +11,7 @@ def get_data():
     return jsonify({"message": "Hello from Flask!"})
 
 @bp.route('/api/files/upload', methods=['POST'])
+@login_required  # Ensures user must be logged in
 def upload_file():
     print("Request received")
     print("Files:", request.files)
@@ -47,6 +49,7 @@ def upload_file():
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 @bp.route('/slicer/slice', methods=['POST'])
+@login_required  # Ensures user must be logged in
 def slice_file():
     data = request.json
     file_id = data.get('fileId')
@@ -92,6 +95,7 @@ def get_slicing_status(slicing_id):
     return jsonify(job)
 
 @bp.route('/printer/send', methods=['POST'])
+@login_required  # Ensures user must be logged in
 def start_print():
     data = request.json
     job_id = str(uuid.uuid4())
@@ -113,8 +117,8 @@ def get_print_status(print_job_id):
         return jsonify({'error': 'Print job not found'}), 404
     return jsonify(job)
 
-
 @bp.route('/api/files/<file_id>', methods=['GET'])
+@login_required  # Ensures user must be logged in
 def get_file(file_id):
     try:
         # Debug logging
@@ -138,81 +142,10 @@ def get_file(file_id):
         print(f"Serving file: {file_path}")
         return send_file(
             file_path,
-            mimetype='application/octet-stream',  # Changed mimetype
-            as_attachment=False  # Changed to false
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=file_path.name  # Sets file name when downloading
         )
     except Exception as e:
         print(f"Error serving file: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-    try:
-        # Debug logging
-        print(f"Attempting to load file with ID: {file_id}")
-        
-        input_dir = Path(__file__).parent.parent / "input"
-        print(f"Looking in directory: {input_dir}")
-        
-        # Find the file
-        file_path = None
-        for file in input_dir.glob('*.stl'):
-            print(f"Found file: {file.name}")
-            if file.stem == file_id:
-                file_path = file
-                break
-        
-        if not file_path:
-            print("File not found")
-            return jsonify({'error': 'File not found'}), 404
-            
-        print(f"Serving file: {file_path}")
-        return send_file(
-            file_path,
-            mimetype='application/octet-stream',  # Changed mimetype
-            as_attachment=False  # Changed to false
-        )
-    except Exception as e:
-        print(f"Error serving file: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-    try:
-        input_dir = Path(__file__).parent.parent / "input"
-        file_path = None
-        
-        # Find the file with matching id
-        for file in input_dir.glob('*.stl'):
-            if file.stem == file_id:
-                file_path = file
-                break
-        
-        if not file_path:
-            return jsonify({'error': 'File not found'}), 404
-            
-        return send_file(
-            file_path,
-            mimetype='application/sla',
-            as_attachment=True,
-            download_name=file_path.name
-        )
-    except Exception as e:
-        print("Error serving file:", str(e))
-        return jsonify({'error': str(e)}), 500
-    try:
-        # Get file path from file_id
-        input_dir = Path(__file__).parent.parent / "input"
-        file_path = None
-        
-        # Find the file with matching id
-        for file in input_dir.glob('*.stl'):
-            if file.stem == file_id:
-                file_path = file
-                break
-        
-        if not file_path:
-            return jsonify({'error': 'File not found'}), 404
-            
-        return send_file(
-            file_path,
-            mimetype='application/sla',
-            as_attachment=True,
-            download_name=file_path.name
-        )
-    except Exception as e:
         return jsonify({'error': str(e)}), 500
