@@ -4,6 +4,7 @@ from backend.services.file_service import FileService
 from backend.database.models import UserRole
 from typing import Tuple, Dict
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('files', __name__)

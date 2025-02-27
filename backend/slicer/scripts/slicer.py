@@ -12,8 +12,8 @@ sys.path.append(slicer_dir)
 
  
 from scripts.file_manager import FileManager
-from config.material_config import MaterialConfig, PrintObject, get_material_names, get_color_names
- 
+from config.material_config import MaterialConfig, PrintObject, get_material_names, get_color_names, Printer, get_available_printers, calculate_price
+from config.env_config import load_config
 
 # Printer's Build Volume
 BUILD_VOLUME = (250, 210, 210)  # (X, Y, Z)
@@ -115,16 +115,21 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
 def setup_object_configurations(components):
     """
     Set up configurations for each object in the STL file.
-    Allows interactive selection of material and color for each object.
+    Allows interactive selection of material and color for each object 
+    depending on the available filaments for each printer.
     """
-    print("\nAvailable Materials and Colors:")
-    print("-" * 30)
-    print("Materials:", get_material_names())
-    print("Colors:", get_color_names())
-
+    printers = get_available_printers()
     
-    materials = get_material_names()
-    colors = get_color_names()
+    # Get unique available materials and colors
+    available_materials = set(printer.material for printer in printers)
+    available_colors = set(printer.color for printer in printers)
+    
+    print("\nAvailable Printer Configurations:")
+    print("-" * 30)
+    
+    for printer in printers:
+        print(f"Printer {printer.printer_id}: {printer.material} - {printer.color}")
+    
     object_configs = []
     
     print("\nDetected Objects:")
@@ -138,52 +143,58 @@ def setup_object_configurations(components):
 
         # Material selection
         while True:
-            print(f"\nAvailable materials: {materials}")
-            material = input(f"Choose material for Object {i} (default=PLA): ").strip().upper()
-            if not material:
-                material = 'PLA'
-            if material in materials:
+            print(f"\nAvailable materials: {available_materials}")
+            material = input(f"Choose material for Object {i}: ").strip().upper()
+            if material in available_materials:
                 break
-            print("Invalid material! Please choose from the list.")
 
-        # Color selection
+            print("Invalid material! Please choose from available printer materials.")
+        
+        # Color selection - show only colors available for selected material
+        available_material_colors = {
+            printer.color for printer in printers 
+            if printer.material == material
+        }
+        
         while True:
-            print(f"\nAvailable colors: {colors}")
-            color = input(f"Choose color for Object {i} (default=Natural): ").strip().title()
-            if not color:
-                color = 'Natural'
-            if color in colors:
+            print(f"\nAvailable colors for {material}: {available_material_colors}")
+            color = input(f"Choose color for Object {i}: ").strip().title()
+            if color in available_material_colors:
                 break
-            print("Invalid color! Please choose from the list.")
+            print("Invalid color! Please choose from available colors for this material.")
+        
+        # Calculate price based on volume and material
+        price, weight = calculate_price(comp.volume, material)
 
-        # Create PrintObject instance instead of MaterialConfig
         config = PrintObject(
             object_id=i,
             volume=comp.volume,
             material=material,
             color=color,
             bounding_box=tuple(comp.bounding_box.extents),
-            face_count=len(comp.faces)
+            face_count=len(comp.faces),
+            weight=weight,
+            price=price
         )
-
+        
         # Print configuration summary
         print(f"\nConfiguration for Object {i}:")
         print(f"  Material: {config.material}")
         print(f"  Color: {config.color}")
         print(f"  Volume: {config.volume:.2f} mm³")
-
+        print(f"  Weight: {config.weight:.2f} g")
+        print(f"  Price: {config.price:.2f} €")
         
         object_configs.append(config)
         
-        # Ask if user wants to configure next object
         if i < len(components):
             continue_config = input("\nPress Enter to configure next object...").strip()
     
     return object_configs
 
-def split_and_distribute_objects(input_path, file_manager, job_name, printer_count, build_volume=BUILD_VOLUME,
+def split_and_distribute_objects(input_path, file_manager, job_name, build_volume=BUILD_VOLUME,
                                volume_threshold=0.001, min_faces=4, padding=10):
-    """Splits an STL into naturally separated objects and distributes them among printers."""
+    """Splits an STL into naturally separated objects and distributes them by material/color."""
     print("Loading STL file...")
     mesh = trimesh.load_mesh(input_path)
 
@@ -196,11 +207,10 @@ def split_and_distribute_objects(input_path, file_manager, job_name, printer_cou
         return []
 
     # Filter objects
-    filtered_objects = []
-    for obj in objects:
-        if obj.volume >= volume_threshold and len(obj.faces) >= min_faces:
-            filtered_objects.append(obj)
-
+    filtered_objects = [
+        obj for obj in objects 
+        if obj.volume >= volume_threshold and len(obj.faces) >= min_faces
+    ]
     
     if not filtered_objects:
         print("No objects remained after filtering.")
@@ -208,84 +218,99 @@ def split_and_distribute_objects(input_path, file_manager, job_name, printer_cou
     
     print(f"Found {len(filtered_objects)} valid objects.")
 
-    # Set up configurations for objects
+    # Get object configurations
     object_configs = setup_object_configurations(filtered_objects)
+    
+    # Group objects by material and color
+    material_color_groups = {}
+    for obj, config in zip(filtered_objects, object_configs):
+        key = (config.material, config.color)
+        if key not in material_color_groups:
+            material_color_groups[key] = []
+        material_color_groups[key].append((obj, config))
 
-    # Print final configuration summary
-    print("\nFinal Object Configurations:")
-    print("-" * 30)
-    for config in object_configs:
-        print(f"\nObject {config.object_id}:")
-        print(f"  Material: {config.material}")
-        print(f"  Color: {config.color}")
-
-
-    # Create job folders on server and locally
+    # Create job folders
     job_folders = file_manager.create_job_folders(job_name)
     output_files = []
     
-    # Distribute objects across printers
-    object_groups = [[] for _ in range(printer_count)]
-    filtered_objects.sort(key=lambda obj: obj.volume, reverse=True)
-    
-    for i, obj in enumerate(filtered_objects):
-        group_index = i % printer_count
-        object_groups[group_index].append(obj)
-
-    # Process each group
-    for i, group in enumerate(object_groups):
-        if group:
-            print(f"Arranging group {i+1}...")
-            arranged_scene, unplaced = arrange_objects_in_print_area(
-                group, build_volume, padding=padding
-            )
-
-            if arranged_scene.geometry:
-                # Get paths for both remote and local files
-                remote_path, local_path = file_manager.get_job_file_paths(job_name, 'stl', i+1)
-                local_path = Path(local_path)
-
-                # Export directly to local output directory
-                arranged_scene.export(str(local_path), file_type='stl')
-                print(f"Exported to local file: {local_path}")
-
-                # Upload to server
-                with open(local_path, 'rb') as f:
-                    file_manager.save_file(f.read(), remote_path)
-                print(f"Uploaded to server: {remote_path}")
-
-                
-                output_files.append(str(local_path))
-                
-            if unplaced:
-                print(f"Warning: {len(unplaced)} objects in group {i+1} could not be placed.")
+    # Process each material/color group
+    printers = get_available_printers()
+    for (material, color), group in material_color_groups.items():
+        # Find matching printer
+        matching_printer = next(
+            (p for p in printers if p.material == material and p.color == color),
+            None
+        )
+        
+        if not matching_printer:
+            print(f"Warning: No printer found for {material} - {color}")
+            continue
+            
+        print(f"\nProcessing group for {material} - {color} (Printer {matching_printer.printer_id})")
+        objects_in_group = [obj for obj, _ in group]
+        
+        # Arrange objects for this group
+        arranged_scene, unplaced = arrange_objects_in_print_area(
+            objects_in_group, 
+            build_volume=matching_printer.build_volume,
+            padding=padding
+        )
+        
+        if arranged_scene.geometry:
+            # Generate unique identifier for this material/color combination
+            group_id = f"{material.lower()}_{color.lower()}"
+            
+            # Get paths for files
+            remote_path, local_path = file_manager.get_job_file_paths(job_name, 'stl', group_id)
+            local_path = Path(local_path)
+            
+            # Export STL
+            arranged_scene.export(str(local_path), file_type='stl')
+            print(f"Exported to local file: {local_path}")
+            
+            # Save to server
+            with open(local_path, 'rb') as f:
+                file_manager.save_file(f.read(), remote_path)
+            
+            output_files.append({
+                'path': str(local_path),
+                'printer': matching_printer,
+                'material': material,
+                'color': color
+            })
+        
+        if unplaced:
+            print(f"Warning: {len(unplaced)} objects could not be placed for {material} - {color}")
     
     return output_files
 
-def slice_with_prusa_slicer(stl_path, file_manager, job_name, group_number, config_path, material_config=None):
-    """Slices an STL to G-code using PrusaSlicer CLI."""
+def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_path):
+    """Slices an STL to G-code using PrusaSlicer CLI with printer-specific settings."""
     prusa_path = "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe"
     
-    # Get paths for both remote and local files
-    remote_path, local_path = file_manager.get_job_file_paths(job_name, 'gcode', group_number)
+    # Generate group identifier
+    group_id = f"{printer.material.lower()}_{printer.color.lower()}"
+    
+    # Get file paths
+    remote_path, local_path = file_manager.get_job_file_paths(job_name, 'gcode', group_id)
     local_path = Path(local_path)
     
-    # Ensure the parent directory exists
+    # Ensure output directory exists
     local_path.parent.mkdir(parents=True, exist_ok=True)
-    
 
     cmd = [
         prusa_path,
         str(stl_path),
         "--load", config_path,
-        "--export-gcode",
+        # Basic slicing command without profile specifications
+        "-g",  # Short form of --export-gcode
         "--output", str(local_path)
     ]
 
     success = False
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print(f"Successfully sliced {stl_path}")
+        print(f"Successfully sliced {stl_path} for printer {printer.printer_id}")
 
         # Upload to server if file exists and is not empty
         if local_path.exists() and local_path.stat().st_size > 0:
@@ -312,62 +337,54 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, group_number, conf
 
 
 if __name__ == "__main__":
-    # Server configuration
-    SERVER_CONFIG = {
-        'host': '10.2.168.6',
-        'username': 'polyprint',
-        'password': 'abc123',
-        'remote_path': '/home/polyprint/3d_prints'
-    }
-
-    # Initialize file manager with SFTP connection
-    file_manager = FileManager(
-        SERVER_CONFIG['host'],
-        SERVER_CONFIG['username'],
-        SERVER_CONFIG['password'],
-        SERVER_CONFIG['remote_path']
-    )
-
-    # Get unique job name
-    job_name = file_manager.generate_unique_folder_name()
-    
-    # Input and config paths
-    input_stl = "backend/slicer/input/Pelletcamv2.1.stl"
-    config = "backend/slicer/config/config.ini"
-    printer_count = 4
-    padding = 10
- 
-    print("Starting processing...")
-    print(f"Input file: {input_stl}")
-    print(f"Job name: {job_name}")
-    print(f"Build volume: {BUILD_VOLUME}")
-    print(f"Number of printers: {printer_count}")
-
     try:
-        # Process STL
-        grouped_stl_files = split_and_distribute_objects(
-            input_stl,
-            file_manager,
-            job_name,
-            printer_count,
-            BUILD_VOLUME,
-            padding=padding
+        config = load_config()
+        
+        file_manager = FileManager(
+            config['server']['host'],
+            config['server']['username'],
+            config['server']['password'],
+            config['server']['remote_path'],
+            config['app']['local_output_path']
+        )
+        
+        job_name = file_manager.generate_unique_folder_name()
+        
+        input_stl = "backend/slicer/input/Pelletcamv2.1.stl"
+        config_path = "backend/slicer/config/config.ini"
+        
+        print("Starting processing...")
+        print(f"Input file: {input_stl}")
+        print(f"Job name: {job_name}")
+
+        # Process STL and get grouped files
+        grouped_files = split_and_distribute_objects(
+            input_path=input_stl,
+            file_manager=file_manager,
+            job_name=job_name,
+            build_volume=config['app']['build_volume'],
+            padding=config['app']['padding']
         )
 
+        if grouped_files:
+            print(f"\nGenerated {len(grouped_files)} STL files")
 
-        if grouped_stl_files:
-            print(f"\nGenerated {len(grouped_stl_files)} STL files")
-            
             # Slice files
             print("\nSlicing files...")
             slicing_success = True
-            for i, stl_file in enumerate(grouped_stl_files):
-                if not slice_with_prusa_slicer(stl_file, file_manager, job_name, i+1, config):
+            for file_info in grouped_files:
+                if not slice_with_prusa_slicer(
+                    file_info['path'],
+                    file_manager,
+                    job_name,
+                    file_info['printer'],
+                    config_path
+                ):
                     slicing_success = False
-                    print(f"Warning: Failed to slice {stl_file}")
+                    print(f"Warning: Failed to slice {file_info['path']}")
 
             if slicing_success:
-                print("\nProcessing complete! All files were successfully processed and uploaded.")
+                print("\nProcessing complete! All files were successfully processed.")
             else:
                 print("\nWarning: Processing completed but some files failed to slice.")
         else:
@@ -375,3 +392,4 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"\nError during processing: {e}")
+        raise

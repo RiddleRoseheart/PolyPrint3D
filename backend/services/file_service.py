@@ -6,7 +6,7 @@ from typing import Optional, List
 from flask import current_app
 import logging
 from backend.database.config import db
-from backend.database.models import UploadedFile, User
+from backend.database.models import UploadedFile, User, UserRole
 
 logger = logging.getLogger(__name__)
 

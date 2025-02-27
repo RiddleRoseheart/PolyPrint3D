@@ -31,22 +31,22 @@ class PrintRequest(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     file_path = db.Column(db.String(255), nullable=False)
     original_file_id = db.Column(db.String(36), db.ForeignKey('uploaded_file.id'), nullable=False)
-    #filament = db.Column(db.String(255))
-    material = db.Column(db.String(50))  # PLA, PETG, etc.
-    color = db.Column(db.String(50))     # Color name
+    #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)  
     dimension = db.Column(db.String(255)) # Build volume dimensions
     filling = db.Column(db.Integer)       # Infill percentage
     layer_height = db.Column(db.Float)    # Layer height in mm
     state = db.Column(db.String(50))     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
+    printer_id = db.Column(db.String(36), db.ForeignKey('printer.id'))
+    weight= db.Column(db.Float)
+    price = db.Column(db.Float)
     
     # Relationships
     original_file = db.relationship('UploadedFile', back_populates='print_requests')
     gcode_file = db.relationship('GCodeFile', back_populates='print_request', uselist=False)
     filaments = db.relationship('Filament', back_populates='print_request')
     user = db.relationship('User', back_populates='print_requests')
-    printer_id = db.Column(db.String(36), db.ForeignKey('printer.id'))
     printer = db.relationship('Printer', back_populates='print_requests')
     
 class GCodeFile(db.Model):
@@ -68,22 +68,28 @@ class Filament(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     print_request_id = db.Column(db.String(36), db.ForeignKey('print_request.id'), nullable=False)
     name = db.Column(db.String(255), nullable=False)
-    
+    price_per_gram = db.Column(db.Float, nullable=False)
+    color_id = db.Column(db.String(36), db.ForeignKey('color.id'), nullable=True)
+    material_id = db.Column(db.String(36), db.ForeignKey('material.id'), nullable=True)
+    printer_id = db.Column(db.String(36), db.ForeignKey('printer.id'), nullable=True)
+      
     # Relationships
     print_request = db.relationship('PrintRequest', back_populates='filaments')
-    color = db.relationship('Color', back_populates='filament', uselist=False)
-    material = db.relationship('Material', back_populates='filament', uselist=False)
-
+    color = db.relationship('Color', back_populates='filaments', uselist=False)
+    material = db.relationship('Material', back_populates='filaments', uselist=False)
+    printer = db.relationship('Printer', back_populates='filaments')
+     
 class Color(db.Model):
     """Color options for filaments"""
     __tablename__ = 'color'
     
     id = db.Column(db.String(36), primary_key=True)
     name = db.Column(db.String(255), nullable=False)
-    filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
+    hex_code = db.Column(db.String(7), nullable=False) #availbale colors
+    #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
     
     # Relationships
-    filament = db.relationship('Filament', back_populates='color')
+    filaments = db.relationship('Filament', back_populates='color')
 
 class Material(db.Model):
     """Material types for filaments"""
@@ -91,10 +97,11 @@ class Material(db.Model):
     
     id = db.Column(db.String(36), primary_key=True)
     name = db.Column(db.String(255), nullable=False)
-    filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
+    density = db.Column(db.Float, nullable=False)
+    #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
     
     # Relationships
-    filament = db.relationship('Filament', back_populates='material')
+    filaments = db.relationship('Filament', back_populates='material')
 
 class User(db.Model, UserMixin):
     """User model with authentication and role management"""
@@ -118,7 +125,7 @@ class Printer(db.Model):
     
     id = db.Column(db.String(36), primary_key=True)
     name = db.Column(db.String(255), nullable=False)
-    ip_address = db.Column(db.String(255), nullable=False)
+    ip_address = db.Column(db.String(255), nullable=False, unique=True)
     api_key = db.Column(db.String(255), nullable=False)
     status = db.Column(db.String(50), default='disconnected')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -126,6 +133,7 @@ class Printer(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_status_check = db.Column(db.DateTime)
     
+    
     # Relationships
     print_requests = db.relationship('PrintRequest', back_populates='printer')
-
+    filaments = db.relationship('Filament', back_populates='printer') 

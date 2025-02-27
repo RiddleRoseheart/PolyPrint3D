@@ -1,9 +1,10 @@
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, redirect
 from flask_login import login_user, logout_user, login_required, current_user
 from backend.services.auth_service import AuthService, InvalidCredentialsError, UserExistsError
 from backend.database.models import User, UserRole
 from marshmallow import Schema, fields
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('auth', __name__)
