@@ -67,6 +67,9 @@ def create_app():
     app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', 'c3d5822dd84d40')
     mail.init_app(app)
 
+    app.config['FILE_MANAGER_USERNAME'] = 'local_user'  # Or get from environment
+    app.config['FILE_MANAGER_PASSWORD'] = 'password'    # Or get from environment
+    app.config['FILE_MANAGER_REMOTE_PATH'] = '/remote'
     # Register blueprints
     # app.register_blueprint(api.bp)
     app.register_blueprint(file_routes.bp)
