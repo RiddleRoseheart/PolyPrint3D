@@ -1,9 +1,25 @@
 @baseUrl = http://127.0.0.1:8000
-@ip = 10.0.0.254
-#@ip = 10.2.168.3
-@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
-#@apiKey = uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo
-@path = C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode
+# printer 1
+#@ip = 192.168.1.7
+#@apiKey = N9BjnWFdBOGCAhNlF9EmepEJ6PAklXDye0pEhRUBYxs
+
+# printer 2
+@ip = 192.168.1.8
+@apiKey = XXTbEpJhyc7DglBQcxzodvch3YbmeJl9Uv6R6PHhgfY
+
+# printer 3
+#@ip = 192.168.1.9
+#@apiKey = 0sEcfqbyAUqaBX-LySJAHY7xANs-_ge1_L7JnpdWz4Y
+
+# printer 4
+#@ip = 192.168.1.10
+#@apiKey = LwkjwuybUCIRZIbdaaQ3UGRykEAyOP6nGkp6MJphzX4
+
+#printer home
+#@ip = 10.0.0.254
+#@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+@path = C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode.
+
 # Test the root endpoint
 GET {{baseUrl}}/
 Accept: application/json
