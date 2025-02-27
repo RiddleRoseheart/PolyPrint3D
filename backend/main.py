@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
 from backend.routes import file_routes, slicer_routes, auth_routes
 from pathlib import Path

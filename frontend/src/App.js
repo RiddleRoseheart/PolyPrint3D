@@ -1,90 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Box, Container, Typography, Stepper, Step, StepLabel, Alert, CircularProgress } from '@mui/material';
-import PrintSettings from './components/PrintSettings';
-import STLFileUpload from './components/STLFileUpload';
-import SlicedFilesPreview from './components/SlicedFilesPreview';
-import PrintingProgress from './components/PrintProgress';
+import { CircularProgress, Container, Box } from '@mui/material';
 import Landing from './components/Landing';
 import AuthPage from './components/authPage';
 import Navbar from './components/Navbar';
 import UserProfile from './components/UserProfile';
-
-const STEPS = [
-  'Upload STL File',
-  'Configure Print Settings',
-  'Preview Slices',
-  'Print Progress'
-];
+import STLFileUpload from './components/STLFileUpload';
+import SlicedFilesPreview from './components/SlicedFilesPreview';
+import PrintSettings from './components/PrintSettings';
+import PrintProgress from './components/PrintProgress';
+import { getCurrentUser } from './api/endpoints/authEndpoints';
 
 function App() {
     const [user, setUser] = useState(null);
-    const [appState, setAppState] = useState({
-        data: null,
-        error: null,
-        uploadedFile: null,
-        slicingResult: null,
-        printStarted: null,
-        isLoading: false
-    });
+    const [loading, setLoading] = useState(true);
 
-    const getActiveStep = () => {
-        if (!appState.uploadedFile) return 0;
-        if (!appState.slicingResult) return 1;
-        if (!appState.printStarted) return 2;
-        return 3;
-    };
+    // Fetch user data on initial render
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const userData = await getCurrentUser();
+                setUser(userData);
+            } catch (error) {
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchUser();
+    }, []);
 
-    const handleFileUploaded = (fileData) => {
-        setAppState(prev => ({
-            ...prev,
-            error: null,
-            uploadedFile: fileData
-        }));
-    };
-
-    const handleSlicingComplete = (result) => {
-        setAppState(prev => ({
-            ...prev,
-            error: null,
-            slicingResult: result
-        }));
-    };
-
-    const handlePrintStart = (printData) => {
-        setAppState(prev => ({
-            ...prev,
-            error: null,
-            printStarted: printData
-        }));
-    };
-
-    const handleReset = () => {
-        setAppState({
-            data: appState.data,
-            error: null,
-            uploadedFile: null,
-            slicingResult: null,
-            printStarted: null,
-            isLoading: false
-        });
-    };
-
-    const handleError = (errorMessage) => {
-        setAppState(prev => ({
-            ...prev,
-            error: errorMessage
-        }));
-    };
-
-    if (appState.isLoading) {
+    if (loading) {
         return (
             <Container maxWidth="lg">
-                <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center', 
-                    minHeight: '100vh' 
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    minHeight: '100vh'
                 }}>
                     <CircularProgress />
                 </Box>
@@ -92,102 +45,36 @@ function App() {
         );
     }
 
-    const renderCurrentStep = () => {
-        if (!appState.uploadedFile) {
-            return <STLFileUpload onFileUploaded={handleFileUploaded} />;
-        }
-        
-        if (!appState.slicingResult) {
-            return (
-                <PrintSettings
-                    fileData={appState.uploadedFile}
-                    onSlicingComplete={handleSlicingComplete}
-                    onReset={handleReset}
-                />
-            );
-        }
-        
-        if (!appState.printStarted) {
-            return (
-                <SlicedFilesPreview
-                    slicingResult={appState.slicingResult}
-                    onPrintStart={handlePrintStart}
-                    onReset={handleReset}
-                />
-            );
-        }
-        
-        return (
-            <PrintingProgress
-                selectedFiles={appState.printStarted}
-                onReset={handleReset}
-                onError={handleError}
-            />
-        );
-    };
-
     return (
         <Router>
             <Navbar user={user} setUser={setUser} />
+
             <Routes>
+                {/* Landing Page - Always Accessible */}
                 <Route path="/Landing" element={<Landing user={user} />} />
-                <Route path="/authPage" element={<AuthPage user={user} setUser={setUser} />} />
-                <Route path="/userProfile" element={<UserProfile user={user} />} />
-                <Route
-                    path="/"
-                    element={
-                        <Container maxWidth="lg">
-                            <Box sx={{ py: 4 }}>
-                                <Box sx={{ mb: 4, textAlign: 'center' }}>
-                                    <Typography variant="h3" component="h1" gutterBottom>
-                                        3D Print Workflow
-                                    </Typography>
-                                    {appState.data && (
-                                        <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-                                            {appState.data}
-                                        </Typography>
-                                    )}
-                                </Box>
 
-                                <Stepper 
-                                    activeStep={getActiveStep()} 
-                                    sx={{ mb: 4 }}
-                                    alternativeLabel
-                                >
-                                    {STEPS.map((label) => (
-                                        <Step key={label}>
-                                            <StepLabel>{label}</StepLabel>
-                                        </Step>
-                                    ))}
-                                </Stepper>
+                {/* Auth Page - Always Accessible */}
+                <Route path="/authPage" element={<AuthPage setUser={setUser} />} />
 
-                                {appState.error && (
-                                    <Alert 
-                                        severity="error" 
-                                        sx={{ mb: 3 }}
-                                        onClose={() => setAppState(prev => ({ ...prev, error: null }))}
-                                    >
-                                        {appState.error}
-                                    </Alert>
-                                )}
+                {/* Protected Routes - Accessible Only When Logged In */}
+                {user ? (
+                    <>
+                        <Route path="/userProfile" element={<UserProfile user={user} />} />
+                        <Route path="/upload" element={<STLFileUpload />} />
+                        <Route path="/preview" element={<SlicedFilesPreview />} />
+                        <Route path="/settings" element={<PrintSettings />} />
+                        <Route path="/progress" element={<PrintProgress />} />
+                    </>
+                ) : (
+                    <>
+                        <Route path="/userProfile" element={<Navigate to="/authPage" />} />
+                        <Route path="/upload" element={<Navigate to="/authPage" />} />
+                    </>
+                )}
 
-                                <Box 
-                                    sx={{ 
-                                        width: '100%', 
-                                        p: 2,
-                                        minHeight: '60vh',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'center'
-                                    }}
-                                >
-                                    {renderCurrentStep()}
-                                </Box>
-                            </Box>
-                        </Container>
-                    }
-                />
-                <Route path="*" element={<Navigate to="/" />} />
+                {/* Redirect '/' and Unmatched Routes to Landing Page */}
+                <Route path="/" element={<Navigate to="/Landing" />} />
+                <Route path="*" element={<Navigate to="/Landing" />} />
             </Routes>
         </Router>
     );

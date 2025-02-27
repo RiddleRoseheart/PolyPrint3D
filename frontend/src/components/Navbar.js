@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { logout } from '../api/endpoints/authEndpoints';
 
 const Navbar = ({ user, setUser }) => {
@@ -10,7 +10,7 @@ const Navbar = ({ user, setUser }) => {
         try {
             await logout();
             setUser(null);
-            navigate('/Landing'); // Redirect to Landing Page after logout
+            navigate('/Landing'); // Redirect after logout
         } catch (error) {
             console.error('Logout failed:', error);
         }
@@ -22,23 +22,25 @@ const Navbar = ({ user, setUser }) => {
                 <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
                     PolyPrint 3D
                 </Typography>
-                {user ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="body1">
-                            Welcome, {user.name}!
-                        </Typography>
-                        <Button
-                            color="inherit"
-                            onClick={handleLogout}
-                        >
-                            Logout
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    {!user ? (
+                        <Button color="inherit" onClick={() => navigate('/authPage')}>
+                            Login
                         </Button>
-                    </Box>
-                ) : (
-                    <Button color="inherit" component={Link} to="/authPage">
-                        Login
-                    </Button>
-                )}
+                    ) : (
+                        <>
+                            <Button color="inherit" onClick={() => navigate('/upload')}>
+                                Start
+                            </Button>
+                            <Button color="inherit" onClick={() => navigate('/userProfile')}>
+                                {user.name}
+                            </Button>
+                            <Button color="inherit" onClick={handleLogout}>
+                                Logout
+                            </Button>
+                        </>
+                    )}
+                </Box>
             </Toolbar>
         </AppBar>
     );
