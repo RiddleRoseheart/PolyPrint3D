@@ -1,6 +1,6 @@
 import axiosInstance from '../axiosConfig';
 import { handleError } from '../../utils/errorHandler';
-
+import axios from 'axios';
 /**
  * API endpoints for authentication operations
  */

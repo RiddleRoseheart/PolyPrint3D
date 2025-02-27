@@ -98,9 +98,11 @@ class FileService:
     def get_file(self, file_id: str, user: User) -> Optional[UploadedFile]:
         """Get file if user has permission"""
         try:
+            logger.info(f"Fetching file {file_id} for user {user.id} (role: {user.role})")
             file_obj = UploadedFile.query.get(file_id)
             if file_obj and (file_obj.user_id == user.id or user.role == UserRole.ADMIN.value):
                 return file_obj
+            logger.error(f"Access denied for user {user.id} to file {file_id}")
             return None
         except Exception as e:
             logger.error(f"Error fetching file {file_id}: {str(e)}")

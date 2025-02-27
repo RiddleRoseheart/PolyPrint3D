@@ -91,25 +91,27 @@ const STLFileUpload = ({ onFileUploaded }) => {
       }));
       return;
     }
-
+  
     try {
       const formData = new FormData();
       formData.append('file', uploadState.selectedFile);
-
+  
       const response = await uploadSTLFile(formData);
       
       setUploadState(prev => ({ ...prev, progress: 100 }));
       
-      onFileUploaded({
-        id: response.id,
-        filename: response.filename,
-        status: response.status,
-        created_at: response.created_at,
-        updated_at: response.updated_at
-      });
-
+      if (onFileUploaded) {
+        onFileUploaded({
+          id: response.id,
+          filename: response.filename,
+          status: response.status,
+          created_at: response.created_at,
+          updated_at: response.updated_at
+        });
+      }
+  
       resetForm();
-
+  
     } catch (err) {
       setUploadState(prev => ({ 
         ...prev, 
@@ -216,5 +218,6 @@ const STLFileUpload = ({ onFileUploaded }) => {
     </Paper>
   );
 };
+
 
 export default STLFileUpload;

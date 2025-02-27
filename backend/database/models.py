@@ -3,6 +3,9 @@ from datetime import datetime
 from flask_login import UserMixin
 from enum import Enum
 
+
+
+
 class UserRole(Enum):
     """Available user roles"""
     USER = 'user'
@@ -137,3 +140,6 @@ class Printer(db.Model):
     # Relationships
     print_requests = db.relationship('PrintRequest', back_populates='printer')
     filaments = db.relationship('Filament', back_populates='printer') 
+
+
+
