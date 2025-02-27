@@ -5,6 +5,7 @@ from backend.database.models import UserRole
 from typing import Tuple, Dict
 import logging
 from pathlib import Path
+import os
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('files', __name__)
@@ -117,4 +118,87 @@ def delete_file(file_id: str) -> Tuple[Dict, int]:
         return jsonify({'error': 'File not found or access denied'}), 404
     except Exception as e:
         logger.error(f"Error deleting file: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/api/files/<file_id>/analyze', methods=['GET'])
+@login_required
+def analyze_file(file_id: str):
+    """Analyze STL file to count separate objects and generate previews"""
+    try:
+        file_obj = file_service.get_file(file_id, current_user)
+        if not file_obj:
+            return jsonify({'error': 'File not found or access denied'}), 404
+            
+        import trimesh
+        import uuid
+        import os
+        from backend.slicer.scripts.slicer import split_disconnected_components
+        
+        print("Loading STL file for analysis...")
+        mesh = trimesh.load_mesh(str(file_obj.file_path))
+        
+        print("Splitting into components...")
+        components = split_disconnected_components(mesh)
+        
+        #TODO
+        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        temp_dir = os.path.join(app_root, 'output', 'temp_objects', file_id)
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        
+        objects_info = []
+        for i, obj in enumerate(components):
+            # Generate a file for this object
+            obj_file_path = os.path.join(temp_dir, f'object_{i+1}.stl')
+            obj.export(obj_file_path)
+            
+            # Create object info
+            objects_info.append({
+                'id': i + 1,
+                'volume': float(obj.volume),
+                'face_count': len(obj.faces),
+                'material': 'PLA',  # Default material
+                'color': 'Black',   # Default color
+                'preview_url': f'/api/files/{file_id}/objects/{i+1}'  # URL to get this object
+            })
+            
+        return jsonify({
+            'object_count': len(objects_info),
+            'objects': objects_info
+        })
+            
+    except Exception as e:
+        logger.error(f"STL analysis error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    
+    
+@bp.route('/api/files/<file_id>/objects/<int:object_id>', methods=['GET'])
+@login_required
+def get_object_file(file_id: str, object_id: int):
+    """Get a specific object's STL file from a multi-object STL"""
+    try:
+        # Check if user has access to the parent file
+        file_obj = file_service.get_file(file_id, current_user)
+        if not file_obj:
+            return jsonify({'error': 'File not found or access denied'}), 404
+            
+        # Return the temporary object file
+        import os
+        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        temp_dir = os.path.join(app_root, 'output', 'temp_objects', file_id)
+        obj_file_path = os.path.join(temp_dir, f'object_{object_id}.stl')
+        
+        if not os.path.exists(obj_file_path):
+            return jsonify({'error': 'Object file not found'}), 404
+            
+        return send_file(
+            obj_file_path,
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=f'object_{object_id}.stl'
+        )
+            
+    except Exception as e:
+        logger.error(f"Error serving object file: {str(e)}")
         return jsonify({'error': str(e)}), 500

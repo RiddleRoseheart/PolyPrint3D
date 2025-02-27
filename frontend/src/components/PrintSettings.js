@@ -10,72 +10,85 @@ import {
     Select, 
     Stack, 
     Typography, 
-    Paper 
+    Paper, 
+    Alert,
+    CircularProgress
 } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
-import { Alert } from '@mui/material';
-import { getFileContent } from '../api/endpoints/fileEndpoints';
-import { sliceSTLFile } from '../api/endpoints/slicerEndpoints';
+import { getFileContent, analyzeSTLFile } from '../api/endpoints/fileEndpoints';
+import { sliceSTLFile, getMaterials, getColors } from '../api/endpoints/slicerEndpoints';
+import MultiObjectSettings from './MultiObjectSettings';
 
-/**
- * Constants for print settings 
- */
 const PRINT_SETTINGS = {
-    MATERIALS: ['PLA', 'ABS', 'PETG'],
     QUALITY_LEVELS: [
         { value: 'LOW', label: 'Low (0.3mm)' },
         { value: 'MEDIUM', label: 'Medium (0.2mm)' },
         { value: 'HIGH', label: 'High (0.1mm)' }
     ],
     INFILL_LEVELS: [20, 50, 80]
-}; //TODO shoudl come from db
+};
 
-const FILAMENTS = [
-    { id: 1, material: 'PLA', color: 'Red', technicalSpecs: 'Print Temp: 200-220°C' },
-    { id: 2, material: 'PLA', color: 'Blue', technicalSpecs: 'Print Temp: 200-220°C' },
-    { id: 3, material: 'ABS', color: 'Black', technicalSpecs: 'Print Temp: 230-250°C' }
-];//TODO shoudl come from db
-
-/**
- * PrintSettings component for configuring 3D print parameters and previewing STL files
- * @param {Object} props
- * @param {Object} props.fileData - Data about the STL file to be printed
- * @param {Function} props.onSlicingComplete - Callback when slicing is complete
- */
 const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
     const [printSettings, setPrintSettings] = useState({
-        material: 'PLA',
         quality: 'MEDIUM',
         infill: 20,
-        selectedFilament: '' //TODO shoudl come from db
     });
     const [isLoading, setIsLoading] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [error, setError] = useState('');
     const [stlFile, setStlFile] = useState(null);
+    const [materials, setMaterials] = useState({});
+    const [colors, setColors] = useState({});
+    const [objectSettings, setObjectSettings] = useState([]);
     const mountRef = useRef(null);
 
-    // Get selected filament details
-    const selectedFilamentDetails = FILAMENTS.find(f => f.id === printSettings.selectedFilament);
-
-    // Load STL file content when fileData changes
+    // Load STL file content, materials, colors and analyze objects
     useEffect(() => {
         if (!fileData?.id) return;
 
-        const loadFileContent = async () => {
+        const loadDataAndAnalyze = async () => {
             try {
+                setIsAnalyzing(true);
+                
+                // Get available materials and colors
+                const [materialsData, colorsData] = await Promise.all([
+                    getMaterials(),
+                    getColors()
+                ]);
+                
+                setMaterials(materialsData || {});
+                setColors(colorsData || {});
+                
+                // Load file for 3D preview
                 const blob = await getFileContent(fileData.id);
                 const file = new File([blob], fileData.filename, { type: 'application/octet-stream' });
                 setStlFile(file);
+                
+                // Analyze STL file to get object count
+                const analysisResult = await analyzeSTLFile(fileData.id);
+                
+                if (analysisResult && analysisResult.objects) {
+                    console.log(`Detected ${analysisResult.objects.length} objects in the STL file`);
+                    setObjectSettings(analysisResult.objects);
+                } else {
+                    // Fallback if analysis fails
+                    setObjectSettings([{ id: 1, material: 'PLA', color: 'Black' }]);
+                    setError('Could not analyze objects in the STL file');
+                }
+                
             } catch (error) {
-                console.error('Error loading file:', error);
-                setError('Failed to load file');
+                console.error('Error loading or analyzing data:', error);
+                setError('Failed to analyze the 3D model');
+                setObjectSettings([{ id: 1, material: 'PLA', color: 'Black' }]);
+            } finally {
+                setIsAnalyzing(false);
             }
         };
 
-        loadFileContent();
+        loadDataAndAnalyze();
     }, [fileData]);
 
-    // Initialize and manage THREE.js scene
+    // Three.js preview setup (keep your existing code)
     useEffect(() => {
         if (!stlFile || !mountRef.current) return;
 
@@ -186,17 +199,15 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
         setError('');
         
         try {
-            const slicingSettings = {
-                fileId: fileData.id,
-                settings: {
-                    material: selectedFilamentDetails?.material || printSettings.material,
-                    quality: printSettings.quality,
+            // Send the object configurations to the backend
+            const response = await sliceSTLFile(fileData.id, {
+                globalSettings: {
                     infill: printSettings.infill,
-                    filamentColor: selectedFilamentDetails?.color
-                }
-            };
+                    quality: printSettings.quality
+                },
+                objects: objectSettings
+            });
             
-            const response = await sliceSTLFile(slicingSettings);
             onSlicingComplete(response);
         } catch (error) {
             setError(error.message || 'Failed to start slicing process');
@@ -210,7 +221,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
         <Stack spacing={3} sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
             <Paper elevation={3} sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>
-                    Preview and Settings
+                    Preview and Global Settings
                 </Typography>
 
                 {error && (
@@ -219,57 +230,30 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                     </Alert>
                 )}
                 
-                <Box 
-                    ref={mountRef} 
-                    sx={{ 
-                        height: 400, 
-                        width: '100%', 
-                        mb: 3,
-                        border: '1px solid #eee',
-                        borderRadius: 1,
-                        overflow: 'hidden',
-                        backgroundColor: '#f5f5f5',
-                        visibility: stlFile ? 'visible' : 'hidden'
-                    }} 
-                />
+                {isAnalyzing ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+                        <CircularProgress />
+                        <Typography variant="body1" sx={{ ml: 2 }}>
+                            Analyzing 3D model...
+                        </Typography>
+                    </Box>
+                ) : (
+                    <Box 
+                        ref={mountRef} 
+                        sx={{ 
+                            height: 400, 
+                            width: '100%', 
+                            mb: 3,
+                            border: '1px solid #eee',
+                            borderRadius: 1,
+                            overflow: 'hidden',
+                            backgroundColor: '#f5f5f5',
+                            visibility: stlFile ? 'visible' : 'hidden'
+                        }} 
+                    />
+                )}
 
                 <Stack spacing={2} direction={{ xs: 'column', md: 'row' }} sx={{ mb: 2 }}>
-                    <FormControl fullWidth>
-                        <InputLabel>Material</InputLabel>
-                        <Select
-                            value={printSettings.material}
-                            label="Material"
-                            onChange={(e) => handleSettingChange('material', e.target.value)}
-                        >
-                            {PRINT_SETTINGS.MATERIALS.map(material => (
-                                <MenuItem key={material} value={material}>
-                                    {material}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth>
-                        <InputLabel>Filament</InputLabel>
-                        <Select
-                            value={printSettings.selectedFilament}
-                            label="Filament"
-                            onChange={(e) => {
-                                const filament = FILAMENTS.find(f => f.id === e.target.value);
-                                handleSettingChange('selectedFilament', e.target.value);
-                                if (filament) {
-                                    handleSettingChange('material', filament.material);
-                                }
-                            }}
-                        >
-                            {FILAMENTS.map(filament => (
-                                <MenuItem key={filament.id} value={filament.id}>
-                                    {`${filament.material} - ${filament.color}`}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
                     <FormControl fullWidth>
                         <InputLabel>Quality</InputLabel>
                         <Select
@@ -300,18 +284,34 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                         </Select>
                     </FormControl>
                 </Stack>
-
-                <LoadingButton
-                    loading={isLoading}
-                    variant="contained"
-                    color="primary"
-                    onClick={handleSlicingSubmit}
-                    fullWidth
-                    disabled={!fileData || isLoading}
-                >
-                    {isLoading ? 'Processing...' : 'Start Slicing'}
-                </LoadingButton>
             </Paper>
+            
+            {isAnalyzing ? (
+                <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
+                    <CircularProgress size={24} sx={{ mr: 2 }} />
+                    <Typography variant="body1" component="span">
+                        Detecting objects in 3D model...
+                    </Typography>
+                </Paper>
+            ) : objectSettings.length > 0 && (
+                <MultiObjectSettings 
+                    objects={objectSettings}
+                    onObjectsChange={setObjectSettings}
+                    materials={materials}
+                    colors={colors}
+                />
+            )}
+            
+            <LoadingButton
+                loading={isLoading || isAnalyzing}
+                variant="contained"
+                color="primary"
+                onClick={handleSlicingSubmit}
+                fullWidth
+                disabled={!fileData || isLoading || isAnalyzing || objectSettings.length === 0}
+            >
+                {isLoading ? 'Processing...' : 'Start Slicing'}
+            </LoadingButton>
         </Stack>
     );
 };

@@ -3,29 +3,36 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import uuid
 import logging
+from backend.slicer.scripts.file_manager import FileManager
 from backend.database.config import db
 from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User
 from backend.slicer.scripts.slicer import split_and_distribute_objects, slice_with_prusa_slicer
-from backend.slicer.scripts.file_manager import FileManager
 from backend.slicer.config.material_config import AVAILABLE_MATERIALS, AVAILABLE_COLORS
 from backend.services.notification_service import NotificationService
+from backend.slicer.config.material_config import AVAILABLE_MATERIALS, AVAILABLE_COLORS
 
 logger = logging.getLogger(__name__)
 
 class SlicerService:
     """Service for handling 3D model slicing operations with user permissions"""
     
-    def __init__(self, output_dir: str | Path, config_path: str | Path, notification_service: NotificationService = None):
+    #TODO
+    def __init__(self, output_dir: str | Path, config_path: str | Path, 
+            notification_service: NotificationService = None, file_manager: FileManager = None):
+            
         """
         Initialize SlicerService
-        
+    
         Args:
             output_dir: Directory for output files
             config_path: Path to slicer configuration file
-        """
+            notification_service: Service for sending notifications
+            file_manager: Optional file manager for handling file operations"""
+        
         self.output_dir = Path(output_dir)
         self.config_path = Path(config_path)
         self.notification_service = notification_service
+        self.file_manager = file_manager
         # Initialize directories
         self._initialize_directories()
         
@@ -53,10 +60,13 @@ class SlicerService:
             ValueError: If file not found or user lacks permission
         """
         try:
+            if not file_id or not isinstance(file_id, str):
+                raise ValueError("Invalid file ID format")
+            
             original_file = UploadedFile.query.get(file_id)
             if not original_file:
-                raise ValueError("File not found")
-            
+                raise ValueError(f"File not found with ID: {file_id}")
+        
             if original_file.user_id != user.id and user.role != 'admin':
                 raise ValueError("Access denied")
 
@@ -75,8 +85,7 @@ class SlicerService:
             output_files = split_and_distribute_objects(
                 str(original_file.file_path),
                 self.file_manager,
-                job_name,
-                printer_count=4  # TODO
+                job_name
             )
 
             print_requests = []
@@ -110,7 +119,7 @@ class SlicerService:
                     print_request.state = "failed"
 
                 print_requests.append(print_request)
-            
+        
             db.session.commit()
             return print_requests
     
@@ -119,6 +128,7 @@ class SlicerService:
             logger.error(f"Slicing error: {str(e)}")
             raise
 
+    
     def get_print_request(self, request_id: str, user: User) -> Optional[PrintRequest]:
         """
         Get print request if user has permission

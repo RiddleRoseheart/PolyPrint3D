@@ -20,14 +20,14 @@ export const sliceSTLFile = async (fileId, settings = {}) => {
     try {
         const response = await axiosInstance.post('/api/slicer/slice', {
             fileId,
-            settings
+            globalSettings: settings.globalSettings || {},
+            objects: settings.objects || []
         });
         return response.data;
     } catch (error) {
         handleError(error);
     }
 };
-
 /**
  * Get all print requests for current user
  * @returns {Promise<Object>} List of print requests

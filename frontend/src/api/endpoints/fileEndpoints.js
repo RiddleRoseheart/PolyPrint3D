@@ -94,10 +94,21 @@ export const getFileContent = async (fileId) => {
     }
 };
 
+export const analyzeSTLFile = async (fileId) => {
+    try {
+        const response = await axiosInstance.get(`/api/files/${fileId}/analyze`);
+        return response.data;
+    } catch (error) {
+        handleError(error);
+        throw error;
+    }
+};
+
 export default {
     uploadSTLFile,
     getUserFiles,
     getFile,
     deleteFile,
-    getFileContent
+    getFileContent,
+    analyzeSTLFile
 };
