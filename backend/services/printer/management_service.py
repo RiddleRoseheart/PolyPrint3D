@@ -51,7 +51,7 @@ class PrinterManagementService(BasePrinterService):
             logger.error(f"Connection failed to {ip}: {str(e)}")
             return False
 
-    def add_printer(self, name: str, ip_address: str, api_key: str) -> Printer:
+    def add_printer(self, name: str, ip_address: str, api_key: str, material: str = None, color: str = None) -> Printer:
         """
         Add new printer to system
         
@@ -59,7 +59,9 @@ class PrinterManagementService(BasePrinterService):
             name: Printer name
             ip_address: Printer IP address
             api_key: OctoPrint API key
-            
+            material: Printer material type (optional)
+            color: Printer filament color (optional)
+                
         Returns:
             Created Printer object
             
@@ -75,7 +77,9 @@ class PrinterManagementService(BasePrinterService):
             ip_address=ip_address,
             api_key=api_key,
             status='disconnected',
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            material=material,
+            color=color
         )
         
         db.session.add(printer)

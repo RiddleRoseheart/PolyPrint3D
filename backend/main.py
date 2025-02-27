@@ -4,9 +4,12 @@ from backend.routes import file_routes, slicer_routes, auth_routes
 from backend.routes.printer import bp as printer_bp
 from pathlib import Path
 import os
+import sys
 from backend.database import init_db, db
 from flask_login import LoginManager 
 from flask_mail import Mail
+from backend.database.models import User
+from backend.utils.dev_data import create_test_data
 
 login_manager = LoginManager() 
 mail = Mail() 
@@ -21,7 +24,22 @@ def init_login_manager(app):
     @login_manager.unauthorized_handler
     def unauthorized():
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
+def check_printer_data(app):
+    """Debug function to check printer data in database"""
+    with app.app_context():
+        from backend.database.models import Printer
+        printers = Printer.query.all()
+        print("\nPrinters in database:")
+        for p in printers:
+            print(f"ID: {p.id}")
+            print(f"Name: {p.name}")
+            print(f"Status: {p.status}")
+            print(f"Available: {p.is_available}")
+            print(f"Material: {p.material}")
+            print(f"Color: {p.color}")
+            print("---")
+
 def create_app():
     app = Flask(__name__)
     CORS(app, resources={
@@ -38,10 +56,22 @@ def create_app():
     init_login_manager(app)
     init_db(app)
     
+    # Configure app
+    app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
+    
+    # Configure Flask-Mail
+    app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
+    app.config['MAIL_PORT'] = 2525
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', 'f20c04086a57e8')
+    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', 'c3d5822dd84d40')
+    mail.init_app(app)
+    
     # Create database tables
     with app.app_context():
         db.create_all()
-    
+        create_test_data()
     
     # Configure upload folder
     app.config['UPLOAD_FOLDER'] = Path('backend/uploads')
@@ -51,30 +81,27 @@ def create_app():
     # Ensure directories exist
     app.config['UPLOAD_FOLDER'].mkdir(parents=True, exist_ok=True)
     app.config['OUTPUT_FOLDER'].mkdir(parents=True, exist_ok=True)
-
-#todo 
-    # Configure app
-    app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
-   
-# Configure Flask-Mail TODO .ENV!! & in production
-    app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
-    app.config['MAIL_PORT'] = 2525
-    app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', 'f20c04086a57e8')
-    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', 'c3d5822dd84d40')
-    mail.init_app(app)
-
+    
+    # Handle database reset
+    if "--reset-db" in sys.argv:
+        print("Resetting database...")
+        with app.app_context():
+            db.drop_all()
+            db.create_all()
+            create_test_data()
+            check_printer_data(app)
+            print("Database reset complete")
+    
     # Register blueprints
-    # app.register_blueprint(api.bp)
     app.register_blueprint(file_routes.bp)
     app.register_blueprint(slicer_routes.bp)
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(printer_bp)
-
+    
     @app.route('/')
     def serve():
         return send_from_directory('../frontend/', 'index.html')
+    
     return app
 
 app = create_app()

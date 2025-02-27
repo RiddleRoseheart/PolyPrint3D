@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify, request, send_file, current_app
 from flask_login import login_required, current_user
 from backend.services.file_service import FileService
-from backend.database.models import UserRole
+from backend.database.models import UserRole, Printer
+from backend.database.config import db
 from typing import Tuple, Dict
 import logging
 
@@ -117,3 +118,35 @@ def delete_file(file_id: str) -> Tuple[Dict, int]:
     except Exception as e:
         logger.error(f"Error deleting file: {str(e)}")
         return jsonify({'error': str(e)}), 500
+    
+
+@bp.route('/api/printers', methods=['GET'])
+def get_all_printers():
+    """
+    Get all printers in the database.
+    Requires authentication.
+    """
+    printers = db.session.query(Printer).all()  # Explicitly query the database
+    if not printers:
+        return jsonify({'error': 'No printers found'}), 404
+        print(printers)
+
+    return jsonify({
+        'printers': [
+            {
+                'id': printer.id,
+                'name': printer.name,
+                'ip_address': printer.ip_address,
+                'api_key': printer.api_key,
+                'status': printer.status,
+                'created_at': printer.created_at.isoformat() if printer.created_at else None,
+                'is_available': printer.is_available,
+                'last_status_check': printer.last_status_check.isoformat() if printer.last_status_check else None,
+                'material': printer.material,  
+                'color': printer.color,
+                'build_volume': printer.build_volume
+            }
+
+            for printer in printers
+        ]
+    }), 200
