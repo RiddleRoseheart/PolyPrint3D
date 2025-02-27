@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #4b7bec; color: white; padding: 10px 20px; }
+        .content { padding: 20px; border: 1px solid #ddd; }
+        .footer { font-size: 12px; color: #999; margin-top: 20px; text-align: center; }
+        h1 { color: #333; }
+        .details { margin: 20px 0; }
+        .details table { width: 100%; border-collapse: collapse; }
+        .details th, .details td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        .details th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body> 
+    <div class="container">
+        <div class="header">
+            <h2>PolyPrint 3D</h2>
+        </div>
+        <div class="content">
+            <h1>Your 3D Print is Complete!</h1>
+            <p>Hello {{ user_name }},</p>
+            <p>Great news! Your 3D print has been completed successfully.</p>
+            
+            <!-- backend/templates/emails/project_completed.html -->
+<div class="parts-details">
+    <h3>Print Parts Summary:</h3>
+    <table>
+        <tr>
+            <th>Part #</th>
+            <th>Filament</th>
+            <th>Dimension</th>
+            <th>Layer</th>
+        </tr>
+        {% for request in print_requests %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ request.filament }}</td>
+            <td>{{ request.dimension }}</td>
+            <td>{{ request.layer }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+            
+            <p>You can pick up your print at your convenience.</p> <!-- TODO -->
+
+            <p>Thank you for using PolyPrint 3D!</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message, please do not reply to this email.</p>
+            <p>&copy; 2025 PolyPrint 3D. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -31,48 +31,38 @@ def create_file_response(file_obj) -> Dict:
 @bp.route('/api/files/upload', methods=['POST'])
 @login_required
 def upload_file() -> Tuple[Dict, int]:
-    """
-    Upload new file
-    Requires authentication
-    """
+    """Upload new STL file"""
     try:
         if 'file' not in request.files:
-            return jsonify({'error': 'No file part'}), 400
-            
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No selected file'}), 400
-            
-        if not file.filename.lower().endswith('.stl'):
-            return jsonify({'error': 'Invalid file type - only STL files are allowed'}), 400
+            return jsonify({'error': 'No file provided'}), 400
 
-        file_obj = file_service.save_file(file, current_user)
+        file_obj = file_service.save_file(request.files['file'], current_user)
         return jsonify(create_file_response(file_obj)), 201
             
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to upload file'}), 500
+
 
 @bp.route('/api/files', methods=['GET'])
 @login_required
 def get_files() -> Tuple[Dict, int]:
-    """
-    Get files - returns all files for admins, user's files for normal users
-    Requires authentication
-    """
+    """Get user's files or all files for admin"""
     try:
-        if current_user.role == UserRole.ADMIN.value:
-            files = file_service.get_all_files()
-        else:
-            files = file_service.get_user_files(current_user)
+        files = (file_service.get_all_files() 
+                if current_user.role == UserRole.ADMIN.value 
+                else file_service.get_user_files(current_user))
         
         return jsonify({
+            'count': len(files),
             'files': [create_file_response(f) for f in files]
         })
     except Exception as e:
-        logger.error(f"Error getting files: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
+        logger.error(f"Files fetch error: {str(e)}")
+        return jsonify({'error': 'Failed to get files'}), 500
+    
 @bp.route('/api/files/<file_id>', methods=['GET'])
 @login_required
 def get_file(file_id: str) -> Tuple[Dict, int]:

@@ -1,0 +1,22 @@
+PolyPrint 3D - Print Completed
+
+Hello {{ user_name }},
+
+Great news! Your 3D print has been completed successfully.
+
+Print Details:
+--------------
+File Name: {{ file_name }}
+Completion Date: {{ print_date }}
+Print Duration: {{ print_duration }}
+Filament: {{ print_settings.filament }}
+Dimension: {{ print_settings.dimension }}
+Filling: {{ print_settings.filling }}
+Layer: {{ print_settings.layer }}
+
+You can pick up your print at your convenience. #TODO
+
+Thank you for using PolyPrint 3D!
+
+This is an automated message, please do not reply to this email.
+© 2025 PolyPrint 3D. All rights reserved.
