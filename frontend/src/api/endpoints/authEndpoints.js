@@ -33,12 +33,17 @@ export const register = async (userData) => {
  */
 export const login = async (credentials) => {
     try {
-        const response = await axiosInstance.post('/api/auth/login', credentials);
-        return response.data;
+        const response = await axiosInstance.post('/api/auth/login', credentials, { withCredentials: true });
+
+        if (response.data) {
+            localStorage.setItem('isAuthenticated', 'true'); // Store login state
+            return response.data;
+        }
     } catch (error) {
         handleError(error);
     }
 };
+
 
 /**
  * Log out the current user
@@ -47,12 +52,13 @@ export const login = async (credentials) => {
  */
 export const logout = async () => {
     try {
-        const response = await axiosInstance.post('/api/auth/logout');
-        return response.data;
+        await axiosInstance.post('/api/auth/logout', {}, { withCredentials: true });
+        localStorage.removeItem('isAuthenticated'); // Clear session
     } catch (error) {
         handleError(error);
     }
 };
+
 
 /**
  * Get current user's information
@@ -61,12 +67,14 @@ export const logout = async () => {
  */
 export const getCurrentUser = async () => {
     try {
-        const response = await axiosInstance.get('/api/auth/user');
+        const response = await axiosInstance.get('/api/auth/user', { withCredentials: true });
         return response.data;
     } catch (error) {
+        localStorage.removeItem('isAuthenticated'); // Remove if session expired
         handleError(error);
     }
 };
+
 
 export default {
     register,

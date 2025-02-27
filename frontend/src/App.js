@@ -17,18 +17,17 @@ function App() {
 
     // Fetch user data on initial render
     useEffect(() => {
-        const fetchUser = async () => {
-            try {
+        const checkAuth = async () => {
+            const isAuthenticated = localStorage.getItem('isAuthenticated');
+            if (isAuthenticated) {
                 const userData = await getCurrentUser();
                 setUser(userData);
-            } catch (error) {
-                setUser(null);
-            } finally {
-                setLoading(false);
             }
+            setLoading(false);
         };
-        fetchUser();
+        checkAuth();
     }, []);
+    
 
     if (loading) {
         return (
