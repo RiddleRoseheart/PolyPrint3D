@@ -5,6 +5,7 @@ from backend.database.models import UserRole, Printer
 from backend.database.config import db
 from typing import Tuple, Dict
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('files', __name__)

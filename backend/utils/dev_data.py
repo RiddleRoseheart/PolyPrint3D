@@ -5,9 +5,9 @@ from backend.database.config import db
 from backend.database.models import User, UserRole, UploadedFile, PrintRequest, Printer, Material, Color, Filament, GCodeFile
 import logging
 import os
- 
+
 logger = logging.getLogger(__name__)
- 
+
 def create_test_data():
     """
     Create test data for development environment.
@@ -16,14 +16,14 @@ def create_test_data():
     if os.environ.get('FLASK_ENV') != 'development':
         logger.info("Not in development environment, skipping test data creation")
         return
-   
+    
     logger.info("Initializing development test data...")
-   
+    
     # Check if we already have users to avoid duplicate creation
     if User.query.count() > 0:
         logger.info("Test data already exists, skipping initialization")
         return
-   
+    
     try:
         # Create test admin user
         admin = User(
@@ -35,7 +35,8 @@ def create_test_data():
             auth_type='local',
             role=UserRole.ADMIN.value
         )
-       
+
+        
         # Create test regular users
         user1 = User(
             id=str(uuid.uuid4()),
@@ -46,7 +47,7 @@ def create_test_data():
             auth_type='local',
             role=UserRole.USER.value
         )
-       
+
         user2 = User(
             id=str(uuid.uuid4()),
             email='user2@polyprint.test',
@@ -56,13 +57,13 @@ def create_test_data():
             auth_type='local',
             role=UserRole.USER.value
         )
-       
+        
         db.session.add_all([admin, user1, user2])
         db.session.commit()
-       
-       
+        
+        
         # TODO fakee
-       
+        
         # Create test printers (for admin)
         test_printer1 = Printer(
             id=str(uuid.uuid4()),
@@ -92,39 +93,39 @@ def create_test_data():
        
         db.session.add_all([test_printer1, test_printer2])
         db.session.commit()
-       
+      
         # Create Materials
         pla = Material(
             id=str(uuid.uuid4()),
             name="PLA",
             density=1.24
         )
-       
+        
         abs_material = Material(
             id=str(uuid.uuid4()),
             name="ABS",
             density=1.04
         )
-       
+        
         db.session.add_all([pla, abs_material])
         db.session.commit()
-       
+        
         # Create Colors
         red = Color(
             id=str(uuid.uuid4()),
             name="Red",
             hex_code="#FF0000"
         )
-       
+
         blue = Color(
             id=str(uuid.uuid4()),
             name="Blue",
             hex_code="#0000FF"
         )
-       
+        
         db.session.add_all([red, blue])
         db.session.commit()
-       
+        
         # For user1
         file1 = UploadedFile(
             id=str(uuid.uuid4()),
@@ -134,10 +135,10 @@ def create_test_data():
             status="uploaded",
             user_id=user1.id
         )
-       
+        
         db.session.add(file1)
         db.session.commit()
-       
+        
         # Create filament
         filament1 = Filament(
             id=str(uuid.uuid4()),
@@ -146,10 +147,10 @@ def create_test_data():
             color=red,
             material=pla
         )
-       
+        
         db.session.add(filament1)
         db.session.commit()
-       
+        
         # Create a print request for user1
         print_request1 = PrintRequest(
             id=str(uuid.uuid4()),
@@ -166,10 +167,10 @@ def create_test_data():
             weight=50.0,
             price=1.50
         )
-       
+        
         db.session.add(print_request1)
         db.session.commit()
-       
+        
         # Create GCode file
         gcode_file1 = GCodeFile(
             id=str(uuid.uuid4()),
@@ -177,10 +178,10 @@ def create_test_data():
             print_request_id=print_request1.id,
             created_at=datetime.utcnow() - timedelta(hours=23)
         )
-       
+        
         db.session.add(gcode_file1)
         db.session.commit()
-       
+        
         # For user2
         file2 = UploadedFile(
             id=str(uuid.uuid4()),
@@ -190,15 +191,15 @@ def create_test_data():
             status="uploaded",
             user_id=user2.id
         )
-       
+        
         db.session.add(file2)
         db.session.commit()
-       
+        
         logger.info("Successfully created development test data:")
         logger.info("Admin user: admin@polyprint.test / Admin123!")
         logger.info("Regular user 1: user1@polyprint.test / User123!")
         logger.info("Regular user 2: user2@polyprint.test / User123!")
-       
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to create test data: {str(e)}")
