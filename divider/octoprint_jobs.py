@@ -1,7 +1,7 @@
 """
 octoprint_jobs.py
 
-This module provides functions to retrieve information about the OctoPrint jobs.
+This module provides functions to manage and retrieve information about OctoPrint jobs.
 """
 import json
 import requests
@@ -30,7 +30,15 @@ def get_status_job(ip: str, api_key: str) -> json:
     else:
         # Log an error if the request failed
         logger.error(f"Failed to retrieve connection info: {response.status_code} - {response.text}")
+
 def print_selected_job(ip: str, api_key: str):
+    """
+    Starts the selected print job on the OctoPrint server.
+
+    :param ip: The IP address of the OctoPrint server.
+    :param api_key: The API key for authentication.
+    :return: Response object from the POST request.
+    """
     octoprint_url: str = f"http://{ip}/api"
     url = f"{octoprint_url}/job"
     headers = {
@@ -41,15 +49,15 @@ def print_selected_job(ip: str, api_key: str):
         "command": "start"
     }
     response = requests.post(url=url, headers=headers, json=data)
-    return  response
+    return response
 
-def cancel_print_job(ip: str, api_key: str) -> bool:
+def cancel_print(ip: str, api_key: str):
     """
     Cancels the current print job on the OctoPrint server.
 
     :param ip: The IP address of the OctoPrint server.
     :param api_key: The API key for authentication.
-    :return: True if the job was successfully canceled, False otherwise.
+    :return: Response object from the POST request.
     """
     octoprint_url: str = f"http://{ip}/api"
     url = f"{octoprint_url}/job"
@@ -57,17 +65,53 @@ def cancel_print_job(ip: str, api_key: str) -> bool:
         'X-Api-Key': api_key,
         'Content-Type': 'application/json'
     }
-    data = json.dumps({"command": "cancel"})
+    data = {
+        "command": "cancel"
+    }
+    response = requests.post(url=url, headers=headers, json=data)
+    return response
 
-    response = requests.post(url=url, headers=headers, data=data)
+def pause_print(ip: str, api_key: str):
+    """
+    Pauses the current print job on the OctoPrint server.
 
-    if response.status_code == 204:
-        # Return True if the job was successfully canceled
-        return True
-    else:
-        # Log an error if the request failed
-        logger.error(f"Failed to cancel print job: {response.status_code} - {response.text}")
-        return False
+    :param ip: The IP address of the OctoPrint server.
+    :param api_key: The API key for authentication.
+    :return: Response object from the POST request.
+    """
+    octoprint_url: str = f"http://{ip}/api"
+    url = f"{octoprint_url}/job"
+    headers = {
+        'X-Api-Key': api_key,
+        'Content-Type': 'application/json'
+    }
+    data = {
+        "command": "pause",
+        "action": "pause"
+    }
+    response = requests.post(url=url, headers=headers, json=data)
+    return response
+
+def resume_print(ip: str, api_key: str):
+    """
+    Resumes the paused print job on the OctoPrint server.
+
+    :param ip: The IP address of the OctoPrint server.
+    :param api_key: The API key for authentication.
+    :return: Response object from the POST request.
+    """
+    octoprint_url: str = f"http://{ip}/api"
+    url = f"{octoprint_url}/job"
+    headers = {
+        'X-Api-Key': api_key,
+        'Content-Type': 'application/json'
+    }
+    data = {
+        "command": "pause",
+        "action": "resume"
+    }
+    response = requests.post(url=url, headers=headers, json=data)
+    return response
 
 if __name__ == '__main__':
     pass
