@@ -35,6 +35,7 @@ def create_test_data():
             auth_type='local',
             role=UserRole.ADMIN.value
         )
+
         
         # Create test regular users
         user1 = User(
@@ -46,7 +47,7 @@ def create_test_data():
             auth_type='local',
             role=UserRole.USER.value
         )
-        
+
         user2 = User(
             id=str(uuid.uuid4()),
             email='user2@polyprint.test',
@@ -71,9 +72,12 @@ def create_test_data():
             api_key='ABCDEF123456',
             status='offline',
             is_available=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            material='PLA',  
+            color='Red',
+            build_volume='250,210,210'      
         )
-        
+
         test_printer2 = Printer(
             id=str(uuid.uuid4()),
             name='Test Printer 2',
@@ -81,12 +85,15 @@ def create_test_data():
             api_key='ABCDEF654321',
             status='online',
             is_available=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            material='ABS',  
+            color='Blue',
+            build_volume='250,210,210' 
         )
-        
+       
         db.session.add_all([test_printer1, test_printer2])
         db.session.commit()
-        
+      
         # Create Materials
         pla = Material(
             id=str(uuid.uuid4()),
@@ -109,7 +116,7 @@ def create_test_data():
             name="Red",
             hex_code="#FF0000"
         )
-        
+
         blue = Color(
             id=str(uuid.uuid4()),
             name="Blue",
@@ -192,7 +199,7 @@ def create_test_data():
         logger.info("Admin user: admin@polyprint.test / Admin123!")
         logger.info("Regular user 1: user1@polyprint.test / User123!")
         logger.info("Regular user 2: user2@polyprint.test / User123!")
-        
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to create test data: {str(e)}")
