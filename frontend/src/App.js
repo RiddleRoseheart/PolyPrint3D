@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Container, Typography, Stepper, Step, StepLabel, Alert, CircularProgress } from '@mui/material';
 import PrintSettings from './components/PrintSettings';
@@ -9,6 +9,7 @@ import Landing from './components/Landing';
 import AuthPage from './components/authPage';
 import Navbar from './components/Navbar';
 import UserProfile from './components/UserProfile';
+import { getCurrentUser } from './api/endpoints/authEndpoints'; // Import the getCurrentUser function
 
 const STEPS = [
   'Upload STL File',
@@ -25,8 +26,24 @@ function App() {
         uploadedFile: null,
         slicingResult: null,
         printStarted: null,
-        isLoading: false
+        isLoading: true // Start with isLoading true to check auth status
     });
+
+    // Check authentication status on app load
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const userData = await getCurrentUser();
+                setUser(userData); // Set the user if logged in
+            } catch (error) {
+                setUser(null); // No user is logged in
+            } finally {
+                setAppState(prev => ({ ...prev, isLoading: false })); // Stop loading
+            }
+        };
+
+        fetchCurrentUser();
+    }, []);
 
     const getActiveStep = () => {
         if (!appState.uploadedFile) return 0;
@@ -77,6 +94,7 @@ function App() {
         }));
     };
 
+    // Show loading spinner while checking auth status
     if (appState.isLoading) {
         return (
             <Container maxWidth="lg">

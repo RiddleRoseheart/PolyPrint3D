@@ -11,6 +11,7 @@ from backend.database.models import User, UserRole
 from typing import Dict, Tuple
 import logging
 import os
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('auth', __name__)
@@ -64,7 +65,10 @@ def register() -> Tuple[Dict, int]:
             role=UserRole.USER.value
         )
         
-        logger.info(f"Registered new user: {user.email}")
+        # Log in the user after registration
+        login_user(user)
+        session.permanent = True  # Make the session permanent
+        logger.info(f"Registered and logged in new user: {user.email}")
         return jsonify(create_user_response(user)), 201
 
     except UserExistsError as e:
@@ -100,8 +104,7 @@ def login() -> Tuple[Dict, int]:
         
         # Set up session
         login_user(user)
-        session.permanent = True
-        
+        session.permanent = True  # Make the session permanent
         logger.info(f"User logged in: {user.email}")
         return jsonify(create_user_response(user))
 
@@ -117,12 +120,14 @@ def logout() -> Tuple[Dict, int]:
     """Log out the current user"""
     logger.info(f"User logged out: {current_user.email}")
     logout_user()
+    session.clear()  # Clear the session on logout
     return jsonify({'message': 'Logged out successfully'})
 
 @bp.route('/api/auth/user', methods=['GET'])
 @login_required
 def get_current_user() -> Tuple[Dict, int]:
     """Get current user's information"""
+    logger.info(f"Fetching current user: {current_user.email}")
     return jsonify(create_user_response(current_user))
 
 @bp.route('/api/auth/admin/users', methods=['GET'])
@@ -161,9 +166,7 @@ def update_user() -> Tuple[Dict, int]:
         logger.error(f"Update failed: {str(e)}")
         return jsonify({'error': 'Update failed'}), 500
     
-#TODO testje 
-# backend/routes/auth_routes.py (add this function)
-
+# Development-only login endpoint
 @bp.route('/dev-login/<user_type>', methods=['GET'])
 def dev_login(user_type):
     """
@@ -188,4 +191,5 @@ def dev_login(user_type):
         return jsonify({'error': 'User not found'}), 404
     
     login_user(user)
+    session.permanent = True  # Make the session permanent
     return redirect('/')
