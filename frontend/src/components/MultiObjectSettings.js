@@ -15,6 +15,16 @@ import {
 } from '@mui/material';
 import ObjectPreview from './ObjectPreview';
 
+/**
+ * Component for individual object settings card
+ * @param {Object} props
+ * @param {Object} props.object - Object data
+ * @param {number} props.index - Index of the object in the list
+ * @param {Object} props.materials - Available materials
+ * @param {Object} props.colors - Available colors with hex values
+ * @param {Function} props.onChange - Change handler for object properties
+ * @returns {JSX.Element} Object settings card component
+ */
 const ObjectSettingsCard = ({ object, index, materials, colors, onChange }) => {
     // Get hex color for the preview
     const hexColor = colors[object.color] || '#00FF00';
@@ -104,7 +114,22 @@ const ObjectSettingsCard = ({ object, index, materials, colors, onChange }) => {
     );
 };
 
+/**
+ * Component for managing multiple object settings
+ * @param {Object} props
+ * @param {Array} props.objects - List of objects to configure
+ * @param {Function} props.onObjectsChange - Handler for when objects are changed
+ * @param {Object} props.materials - Available materials
+ * @param {Object} props.colors - Available colors with hex values
+ * @returns {JSX.Element} Multi-object settings component
+ */
 const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors }) => {
+    /**
+     * Handle changes to a specific object property
+     * @param {number} index - Index of the object to update
+     * @param {string} property - Property to update
+     * @param {any} value - New value for the property
+     */
     const handleObjectChange = (index, property, value) => {
         const updatedObjects = [...objects];
         updatedObjects[index] = {
@@ -114,6 +139,11 @@ const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors }) =>
         onObjectsChange(updatedObjects);
     };
 
+    /**
+     * Apply a property value to all objects
+     * @param {string} property - Property to update
+     * @param {any} value - Value to apply to all objects
+     */
     const applyToAll = (property, value) => {
         const updatedObjects = objects.map(obj => ({
             ...obj,
@@ -154,9 +184,27 @@ const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors }) =>
                             size="small"
                             label="Color"
                             onChange={(e) => applyToAll('color', e.target.value)}
+                            sx={{
+                                '& .MuiSelect-select': {
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }
+                            }}
                         >
                             {Object.keys(colors).map(color => (
-                                <MenuItem key={color} value={color}>
+                                <MenuItem key={color} value={color} sx={{ display: 'flex', alignItems: 'center' }}>
+                                    <Box 
+                                        component="span" 
+                                        sx={{ 
+                                            display: 'inline-block', 
+                                            width: 16, 
+                                            height: 16, 
+                                            bgcolor: colors[color],
+                                            mr: 1,
+                                            border: '1px solid #ccc',
+                                            borderRadius: '2px'
+                                        }} 
+                                    />
                                     {color}
                                 </MenuItem>
                             ))}
@@ -177,6 +225,12 @@ const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors }) =>
                     onChange={handleObjectChange}
                 />
             ))}
+            
+            {objects.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+                    No objects available
+                </Typography>
+            )}
         </Paper>
     );
 };

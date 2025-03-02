@@ -1,8 +1,9 @@
-from flask import Blueprint, jsonify, request, send_file, current_app
+from flask import Blueprint, request, send_file, current_app
 from flask_login import login_required, current_user
 from backend.services.file_service import FileService
-from backend.database.models import UserRole
-from typing import Tuple, Dict
+from backend.database.models import UserRole, PrintRequest
+from backend.utils import ResponseBuilder
+from typing import Tuple, Dict, Any
 import logging
 from pathlib import Path
 import os
@@ -20,63 +21,61 @@ def on_register(state):
     file_service = FileService(upload_folder)
 
 
-def create_file_response(file_obj) -> Dict:
-    """Create standardized file response dictionary"""
-    return {
-        'id': file_obj.id,
-        'filename': file_obj.filename,
-        'status': file_obj.status,
-        'created_at': file_obj.created_at.isoformat(),
-        'user_id': file_obj.user_id
-    }
-
 @bp.route('/api/files/upload', methods=['POST'])
 @login_required
-def upload_file() -> Tuple[Dict, int]:
+def upload_file() -> Tuple[Dict[str, Any], int]:
     """Upload new STL file"""
     try:
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+            return ResponseBuilder.error("No file provided", 400)
 
         file_obj = file_service.save_file(request.files['file'], current_user)
-        return jsonify(create_file_response(file_obj)), 201
+        
+        return ResponseBuilder.success(
+            ResponseBuilder.create_file_response(file_obj),  # Use the utility method
+            "File uploaded successfully",
+            201
+        )
             
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return ResponseBuilder.error(str(e), 400)
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
-        return jsonify({'error': 'Failed to upload file'}), 500
-
+        return ResponseBuilder.error("Failed to upload file", 500)
 
 @bp.route('/api/files', methods=['GET'])
 @login_required
-def get_files() -> Tuple[Dict, int]:
+def get_files() -> Tuple[Dict[str, Any], int]:
     """Get user's files or all files for admin"""
     try:
         files = (file_service.get_all_files() 
                 if current_user.role == UserRole.ADMIN.value 
                 else file_service.get_user_files(current_user))
         
-        return jsonify({
+        return ResponseBuilder.success({
             'count': len(files),
-            'files': [create_file_response(f) for f in files]
+            'files': [ResponseBuilder.create_file_response(f) for f in files]
         })
     except Exception as e:
         logger.error(f"Files fetch error: {str(e)}")
-        return jsonify({'error': 'Failed to get files'}), 500
+        return ResponseBuilder.error("Failed to get files", 500)
     
 @bp.route('/api/files/<file_id>', methods=['GET'])
 @login_required
-def get_file(file_id: str) -> Tuple[Dict, int]:
+def get_file(file_id: str) -> Tuple[Dict[str, Any], int]:
     """
     Get file metadata
     Requires authentication and proper permissions
     """
-    file_obj = file_service.get_file(file_id, current_user)
-    if not file_obj:
-        return jsonify({'error': 'File not found or access denied'}), 404
-    
-    return jsonify(create_file_response(file_obj))
+    try:
+        file_obj = file_service.get_file(file_id, current_user)
+        if not file_obj:
+            return ResponseBuilder.error("File not found or access denied", 404)
+        
+        return ResponseBuilder.success(ResponseBuilder.create_file_response(file_obj))
+    except Exception as e:
+        logger.error(f"Error fetching file metadata: {str(e)}")
+        return ResponseBuilder.error(str(e), 500)
 
 @bp.route('/api/files/<file_id>/content', methods=['GET'])
 @login_required
@@ -88,11 +87,11 @@ def get_file_content(file_id: str):
     try:
         file_obj = file_service.get_file(file_id, current_user)
         if not file_obj:
-            return jsonify({'error': 'File not found or access denied'}), 404
+            return ResponseBuilder.error("File not found or access denied", 404)
 
         file_path = Path(file_obj.file_path)
         if not file_path.exists():
-            return jsonify({'error': 'File not found on disk'}), 404
+            return ResponseBuilder.error("File not found on disk", 404)
             
         return send_file(
             str(file_path),
@@ -103,74 +102,41 @@ def get_file_content(file_id: str):
             
     except Exception as e:
         logger.error(f"Error serving file content: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return ResponseBuilder.error(str(e), 500)
 
 @bp.route('/api/files/<file_id>', methods=['DELETE'])
 @login_required
-def delete_file(file_id: str) -> Tuple[Dict, int]:
+def delete_file(file_id: str) -> Tuple[Dict[str, Any], int]:
     """
     Delete file
     Requires authentication and proper permissions
     """
     try:
         if file_service.delete_file(file_id, current_user):
-            return '', 204
-        return jsonify({'error': 'File not found or access denied'}), 404
+            return ResponseBuilder.success(message="File deleted successfully", status_code=204)
+        return ResponseBuilder.error("File not found or access denied", 404)
     except Exception as e:
         logger.error(f"Error deleting file: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return ResponseBuilder.error(str(e), 500)
 
 
 @bp.route('/api/files/<file_id>/analyze', methods=['GET'])
 @login_required
-def analyze_file(file_id: str):
+def analyze_file(file_id: str) -> Tuple[Dict[str, Any], int]:
     """Analyze STL file to count separate objects and generate previews"""
     try:
         file_obj = file_service.get_file(file_id, current_user)
         if not file_obj:
-            return jsonify({'error': 'File not found or access denied'}), 404
+            return ResponseBuilder.error("File not found or access denied", 404)
             
-        import trimesh
-        import uuid
-        import os
-        from backend.slicer.scripts.slicer import split_disconnected_components
-        
-        print("Loading STL file for analysis...")
-        mesh = trimesh.load_mesh(str(file_obj.file_path))
-        
-        print("Splitting into components...")
-        components = split_disconnected_components(mesh)
-        
-        #TODO
-        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        temp_dir = os.path.join(app_root, 'output', 'temp_objects', file_id)
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        
-        objects_info = []
-        for i, obj in enumerate(components):
-            # Generate a file for this object
-            obj_file_path = os.path.join(temp_dir, f'object_{i+1}.stl')
-            obj.export(obj_file_path)
+        analysis_results = file_service.analyze_file(file_id, current_user)
+        return ResponseBuilder.success(analysis_results)
             
-            # Create object info
-            objects_info.append({
-                'id': i + 1,
-                'volume': float(obj.volume),
-                'face_count': len(obj.faces),
-                'material': 'PLA',  # Default material
-                'color': 'Black',   # Default color
-                'preview_url': f'/api/files/{file_id}/objects/{i+1}'  # URL to get this object
-            })
-            
-        return jsonify({
-            'object_count': len(objects_info),
-            'objects': objects_info
-        })
-            
+    except ValueError as e:
+        return ResponseBuilder.error(str(e), 400)
     except Exception as e:
         logger.error(f"STL analysis error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return ResponseBuilder.error(str(e), 500)
     
     
 @bp.route('/api/files/<file_id>/objects/<int:object_id>', methods=['GET'])
@@ -181,19 +147,18 @@ def get_object_file(file_id: str, object_id: int):
         # Check if user has access to the parent file
         file_obj = file_service.get_file(file_id, current_user)
         if not file_obj:
-            return jsonify({'error': 'File not found or access denied'}), 404
+            return ResponseBuilder.error("File not found or access denied", 404)
             
-        # Return the temporary object file
-        import os
-        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        temp_dir = os.path.join(app_root, 'output', 'temp_objects', file_id)
-        obj_file_path = os.path.join(temp_dir, f'object_{object_id}.stl')
+        # Use configuration for temp directory path instead of hardcoding
+        temp_dir = Path(current_app.config.get('TEMP_OBJECTS_DIR', 
+                    os.path.join(current_app.root_path, 'output', 'temp_objects'))) / file_id
+        obj_file_path = temp_dir / f'object_{object_id}.stl'
         
-        if not os.path.exists(obj_file_path):
-            return jsonify({'error': 'Object file not found'}), 404
+        if not obj_file_path.exists():
+            return ResponseBuilder.error("Object file not found", 404)
             
         return send_file(
-            obj_file_path,
+            str(obj_file_path),
             mimetype='application/octet-stream',
             as_attachment=True,
             download_name=f'object_{object_id}.stl'
@@ -201,4 +166,36 @@ def get_object_file(file_id: str, object_id: int):
             
     except Exception as e:
         logger.error(f"Error serving object file: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return ResponseBuilder.error(str(e), 500)
+    
+@bp.route('/api/slicer/preview/<request_id>', methods=['GET'])
+@login_required
+def preview_print_request(request_id: str):
+    """
+    Get STL file for preview from a print request
+    Requires authentication and proper permissions
+    """
+    try:
+        print_request = PrintRequest.query.get(request_id)
+        if not print_request:
+            return ResponseBuilder.error("Print request not found", 404)
+            
+        # Check if user has access
+        if print_request.user_id != current_user.id and current_user.role != UserRole.ADMIN.value:
+            return ResponseBuilder.error("Access denied", 403)
+            
+        # Check if file exists
+        file_path = Path(print_request.file_path)
+        if not file_path.exists():
+            return ResponseBuilder.error("STL file not found on disk", 404)
+            
+        return send_file(
+            str(file_path),
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=f'preview_{request_id}.stl'
+        )
+            
+    except Exception as e:
+        logger.error(f"Error serving preview: {str(e)}")
+        return ResponseBuilder.error(str(e), 500)

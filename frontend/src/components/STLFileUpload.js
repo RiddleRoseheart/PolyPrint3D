@@ -97,16 +97,17 @@ const STLFileUpload = ({ onFileUploaded }) => {
       formData.append('file', uploadState.selectedFile);
 
       const response = await uploadSTLFile(formData);
+      console.log('Upload response in component:', response);
       
+      const fileData = response.status === 'success' ? response.data : response;
+
+      if (!fileData || !fileData.id) {
+        throw new Error('Invalid response format from server');
+      }
+
       setUploadState(prev => ({ ...prev, progress: 100 }));
       
-      onFileUploaded({
-        id: response.id,
-        filename: response.filename,
-        status: response.status,
-        created_at: response.created_at,
-        updated_at: response.updated_at
-      });
+      onFileUploaded(fileData);
 
       resetForm();
 

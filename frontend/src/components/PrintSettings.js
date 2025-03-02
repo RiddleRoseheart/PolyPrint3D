@@ -64,11 +64,20 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                 const file = new File([blob], fileData.filename, { type: 'application/octet-stream' });
                 setStlFile(file);
                 
-                // Analyze STL file to get object count
+                                // Analyze STL file to get object count
                 const analysisResult = await analyzeSTLFile(fileData.id);
-                
-                if (analysisResult && analysisResult.objects) {
-                    console.log(`Detected ${analysisResult.objects.length} objects in the STL file`);
+
+                // Add debugging
+                console.log('Analysis result structure:', analysisResult);
+
+                // Check for the new response structure with .data property
+                if (analysisResult && analysisResult.status === 'success' && analysisResult.data && analysisResult.data.objects) {
+                    const objects = analysisResult.data.objects;
+                    console.log(`Detected ${objects.length} objects in the STL file`);
+                    setObjectSettings(objects);
+                } else if (analysisResult && analysisResult.objects) {
+                    // Fallback for old response format
+                    console.log(`Detected ${analysisResult.objects.length} objects in the STL file (old format)`);
                     setObjectSettings(analysisResult.objects);
                 } else {
                     // Fallback if analysis fails
@@ -199,6 +208,16 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
         setError('');
         
         try {
+            //whats being send to backend
+            console.log('Sending slicing request with configurations:', {
+                fileId: fileData.id,
+                globalSettings: {
+                    infill: printSettings.infill,
+                    quality: printSettings.quality
+                },
+                objects: objectSettings
+            });
+
             // Send the object configurations to the backend
             const response = await sliceSTLFile(fileData.id, {
                 globalSettings: {
@@ -207,7 +226,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                 },
                 objects: objectSettings
             });
-            
+            console.log('Slicing completed successfully:', response);
             onSlicingComplete(response);
         } catch (error) {
             setError(error.message || 'Failed to start slicing process');

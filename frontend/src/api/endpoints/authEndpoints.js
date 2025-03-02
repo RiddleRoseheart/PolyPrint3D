@@ -68,9 +68,11 @@ export const getCurrentUser = async () => {
     }
 };
 
-export default {
+const authEndpoints = {
     register,
     login,
     logout,
     getCurrentUser
 };
+
+export default authEndpoints;
