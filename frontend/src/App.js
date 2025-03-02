@@ -205,7 +205,7 @@ function App() {
                         </Container>
                     }
                 />
-                <Route path="*" element={<Navigate to="/" />} />
+                <Route path="*" element={<Navigate to="/Landing" />} />
             </Routes>
         </Router>
     );
