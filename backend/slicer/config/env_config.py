@@ -8,8 +8,16 @@ def load_config():
     Returns dict with server and application settings
     """
     # Load .env file from the project root
-    env_path = Path(__file__).parent.parent / '.env'
+    env_path = Path(__file__).parent.parent.parent.parent / '.env'
+    print(f"Looking for .env file at: {env_path.absolute()}")
+    print(f"File exists: {env_path.exists()}")
+    
     load_dotenv(env_path)
+
+    # Print environment variables to debug
+    print(f"SFTP_HOST: {os.getenv('SFTP_HOST')}")
+    print(f"SFTP_USERNAME: {os.getenv('SFTP_USERNAME')}")
+    print(f"SFTP_PASSWORD: {'[SET]' if os.getenv('SFTP_PASSWORD') else '[NOT SET]'}")
 
     # Server configuration
     server_config = {

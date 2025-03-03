@@ -132,6 +132,10 @@ class Printer(db.Model):
     is_available = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_status_check = db.Column(db.DateTime)
+
+    material = db.Column(db.String(50), nullable=True)
+    color = db.Column(db.String(50), nullable=True)
+    build_volume = db.Column(db.String(50), default='250,210,210')  # Add this line
     
     
     # Relationships

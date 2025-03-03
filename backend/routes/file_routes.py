@@ -4,6 +4,9 @@ from backend.services.file_service import FileService
 from backend.database.models import UserRole, PrintRequest
 from backend.utils import ResponseBuilder
 from typing import Tuple, Dict, Any
+from backend.database.models import UserRole, Printer
+from backend.database.config import db
+from typing import Tuple, Dict
 import logging
 from pathlib import Path
 import os
@@ -199,3 +202,37 @@ def preview_print_request(request_id: str):
     except Exception as e:
         logger.error(f"Error serving preview: {str(e)}")
         return ResponseBuilder.error(str(e), 500)
+      
+    
+
+@bp.route('/api/printers', methods=['GET'])
+def get_all_printers():
+    """
+    Get all printers in the database.
+    Requires authentication.
+    """
+    printers = db.session.query(Printer).all()  
+    if not printers:
+        return jsonify({'error': 'No printers found'}), 404
+        print(printers)
+
+    return jsonify({
+        'printers': [
+            {
+                'id': printer.id,
+                'name': printer.name,
+                'ip_address': printer.ip_address,
+                'api_key': printer.api_key,
+                'status': printer.status,
+                'created_at': printer.created_at.isoformat() if printer.created_at else None,
+                'is_available': printer.is_available,
+                'last_status_check': printer.last_status_check.isoformat() if printer.last_status_check else None,
+                'material': printer.material,  
+                'color': printer.color,
+                'build_volume': printer.build_volume
+            }
+
+            for printer in printers
+        ]
+    }), 200
+
