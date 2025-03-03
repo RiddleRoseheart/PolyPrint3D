@@ -80,6 +80,23 @@ def create_app():
     # Ensure directories exist
     app.config['UPLOAD_FOLDER'].mkdir(parents=True, exist_ok=True)
     app.config['OUTPUT_FOLDER'].mkdir(parents=True, exist_ok=True)
+
+#todo 
+    # Configure app
+    app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
+   
+# Configure Flask-Mail TODO .ENV!! & in production
+    app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
+    app.config['MAIL_PORT'] = 2525
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', 'f20c04086a57e8')
+    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', 'c3d5822dd84d40')
+    mail.init_app(app)
+
+    app.config['FILE_MANAGER_USERNAME'] = 'local_user'  # Or get from environment
+    app.config['FILE_MANAGER_PASSWORD'] = 'password'    # Or get from environment
+    app.config['FILE_MANAGER_REMOTE_PATH'] = '/remote'
     
     # Handle database reset
     if "--reset-db" in sys.argv:

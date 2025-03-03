@@ -1,5 +1,6 @@
 import axiosInstance from '../axiosConfig';
 import { handleError } from '../../utils/errorHandler';
+import { processResponse } from './adapter';
 
 /**
  * API endpoints for slicing operations
@@ -20,9 +21,10 @@ export const sliceSTLFile = async (fileId, settings = {}) => {
     try {
         const response = await axiosInstance.post('/api/slicer/slice', {
             fileId,
-            settings
+            globalSettings: settings.globalSettings || {},
+            objects: settings.objects || []
         });
-        return response.data;
+        return processResponse(response.data);
     } catch (error) {
         handleError(error);
     }
@@ -36,7 +38,7 @@ export const sliceSTLFile = async (fileId, settings = {}) => {
 export const getPrintRequests = async () => {
     try {
         const response = await axiosInstance.get('/api/slicer/requests');
-        return response.data;
+        return processResponse(response.data);
     } catch (error) {
         handleError(error);
     }
@@ -51,7 +53,7 @@ export const getPrintRequests = async () => {
 export const getPrintRequest = async (requestId) => {
     try {
         const response = await axiosInstance.get(`/api/slicer/requests/${requestId}`);
-        return response.data;
+        return processResponse(response.data);
     } catch (error) {
         handleError(error);
     }
@@ -78,7 +80,7 @@ export const deletePrintRequest = async (requestId) => {
 export const getMaterials = async () => {
     try {
         const response = await axiosInstance.get('/api/slicer/materials');
-        return response.data;
+        return processResponse(response.data);
     } catch (error) {
         handleError(error);
     }
@@ -91,17 +93,41 @@ export const getMaterials = async () => {
 export const getColors = async () => {
     try {
         const response = await axiosInstance.get('/api/slicer/colors');
+        return processResponse(response.data);
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Download G-code file for a print request
+ * @param {string} requestId - ID of the print request
+ * @returns {Promise<Blob>} G-code content as binary data
+ * @throws {Error} If download fails
+ */
+export const downloadGcode = async (requestId) => {
+    try {
+        const response = await axiosInstance.get(`/api/slicer/download/${requestId}`, {
+            responseType: 'blob',
+            headers: {
+                'Accept': 'application/octet-stream'
+            }
+        });
         return response.data;
     } catch (error) {
         handleError(error);
     }
 };
 
-export default {
+
+const slicerEndpoints = {
     sliceSTLFile,
     getPrintRequests,
     getPrintRequest,
     deletePrintRequest,
     getMaterials,
-    getColors
+    getColors,
+    downloadGcode
 };
+
+export default slicerEndpoints;

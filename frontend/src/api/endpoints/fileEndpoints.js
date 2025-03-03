@@ -1,4 +1,3 @@
-// src/api/endpoints/fileEndpoints.js
 import axiosInstance from '../axiosConfig';
 import { handleError } from '../../utils/errorHandler';
 
@@ -94,10 +93,27 @@ export const getFileContent = async (fileId) => {
     }
 };
 
-export default {
+export const analyzeSTLFile = async (fileId) => {
+    try {
+        const response = await axiosInstance.get(`/api/files/${fileId}/analyze`);
+        console.log('Raw analyze response:', response.data);
+        
+        
+        return response.data;
+    } catch (error) {
+        console.error('Analysis error:', error);
+        handleError(error);
+        throw error;
+    }
+};
+
+const fileEndpoints = {
     uploadSTLFile,
     getUserFiles,
     getFile,
     deleteFile,
-    getFileContent
+    getFileContent,
+    analyzeSTLFile
 };
+
+export default fileEndpoints;

@@ -160,32 +160,3 @@ def update_user() -> Tuple[Dict, int]:
     except Exception as e:
         logger.error(f"Update failed: {str(e)}")
         return jsonify({'error': 'Update failed'}), 500
-    
-#TODO testje 
-# backend/routes/auth_routes.py (add this function)
-
-@bp.route('/dev-login/<user_type>', methods=['GET'])
-def dev_login(user_type):
-    """
-    Development-only login endpoint
-    Only works when FLASK_ENV is development
-    """
-    if os.environ.get('FLASK_ENV') != 'development':
-        return jsonify({'error': 'Not available in production'}), 403
-    
-    email = None
-    if user_type == 'admin':
-        email = 'admin@polyprint.test'
-    elif user_type == 'user1':
-        email = 'user1@polyprint.test'
-    elif user_type == 'user2':
-        email = 'user2@polyprint.test'
-    else:
-        return jsonify({'error': 'Invalid user type'}), 400
-    
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    login_user(user)
-    return redirect('/')

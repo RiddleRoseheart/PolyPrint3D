@@ -7,7 +7,7 @@ const axiosInstance = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 30000, //(ang gehouden voor slicing process)
+    timeout: 60000, //(ang gehouden voor slicing process)
 });
 
 // Basic error handling

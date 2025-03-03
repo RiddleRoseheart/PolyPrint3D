@@ -166,11 +166,12 @@ def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10
     return scene, unplaced_objects
  
 
-def setup_object_configurations(components):
+def setup_object_configurations(components, config_params):
     """
     Set up configurations for each object in the STL file.
     Allows interactive selection of material and color for each object 
     depending on the available filaments for each printer.
+    Used UI selections now
     """
     printers = get_available_printers_from_service()
     
@@ -194,32 +195,32 @@ def setup_object_configurations(components):
         print(f"\nObject {i}:")
         print(f"  Volume: {comp.volume:.2f} mm³")
         print(f"  Size: {tuple(comp.bounding_box.extents)}")
-
-        # Material selection
-        while True:
-            print(f"\nAvailable materials: {available_materials}")
-            material = input(f"Choose material for Object {i}: ").strip().upper()
-            if material in available_materials:
-                break
-
-            print("Invalid material! Please choose from available printer materials.")
         
-        # Color selection - show only colors available for selected material
+        # Get the corresponding configuration from UI
+        ui_config = config_params[i-1] if i <= len(config_params) else None
+        
+        # Use provided material or default to PLA
+        material = ui_config.get('material', 'PLA').upper() if ui_config else 'PLA'
+        if material not in available_materials:
+            print(f"Warning: Material {material} not available. Using PLA.")
+            material = 'PLA'
+            
+        # Use provided color or default to first available for this material
+        color = ui_config.get('color', 'Black').title() if ui_config else 'Black'
+        
+        # Verify color is available for this material
         available_material_colors = {
             printer.color for printer in printers 
             if printer.material == material
         }
         
-        while True:
-            print(f"\nAvailable colors for {material}: {available_material_colors}")
-            color = input(f"Choose color for Object {i}: ").strip().title()
-            if color in available_material_colors:
-                break
-            print("Invalid color! Please choose from available colors for this material.")
+        if color not in available_material_colors:
+            print(f"Warning: Color {color} not available for {material}. Using first available color.")
+            color = next(iter(available_material_colors)) if available_material_colors else 'Black'
         
         # Calculate price based on volume and material
         price, weight = calculate_price(comp.volume, material)
-
+        
         config = PrintObject(
             object_id=i,
             volume=comp.volume,
@@ -243,13 +244,10 @@ def setup_object_configurations(components):
 
         print_price_summary(object_configs)
         
-        if i < len(components):
-            continue_config = input("\nPress Enter to configure next object...").strip()
-    
     return object_configs
 
 def split_and_distribute_objects(input_path, file_manager, job_name, build_volume=BUILD_VOLUME,
-                               volume_threshold=0.001, min_faces=4, padding=10):
+                               volume_threshold=0.001, min_faces=4, padding=10, object_params=None):
     """Splits an STL into naturally separated objects and distributes them by material/color."""
     print("Loading STL file...")
     mesh = trimesh.load_mesh(input_path)
@@ -275,7 +273,7 @@ def split_and_distribute_objects(input_path, file_manager, job_name, build_volum
     print(f"Found {len(filtered_objects)} valid objects.")
 
     # Get object configurations
-    object_configs = setup_object_configurations(filtered_objects)
+    object_configs = setup_object_configurations(filtered_objects, object_params or [])
     
     # Group objects by material and color
     material_color_groups = {}
@@ -331,11 +329,18 @@ def split_and_distribute_objects(input_path, file_manager, job_name, build_volum
             with open(local_path, 'rb') as f:
                 file_manager.save_file(f.read(), remote_path)
             
+            # Calculate total price and weight for this group
+            total_price = sum(config.price for _, config in group)
+            total_weight = sum(config.weight for _, config in group)
+        
             output_files.append({
                 'path': str(local_path),
                 'printer': matching_printer,
                 'material': material,
-                'color': color
+                'color': color, 
+                'price':total_price,
+                'weight':total_weight
+                
             })
         
         if unplaced:
@@ -373,9 +378,10 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
 
         # Upload to server if file exists and is not empty
         if local_path.exists() and local_path.stat().st_size > 0:
-            with open(local_path, 'rb') as f:
-                file_manager.save_file(f.read(), remote_path)
-            print(f"G-code uploaded to server: {remote_path}")
+            if file_manager.is_connected and remote_path:
+                with open(local_path, 'rb') as f:
+                    file_manager.save_file(f.read(), remote_path)
+                print(f"G-code uploaded to server: {remote_path}")
             success = True
         else:
             print(f"Warning: G-code file not found or empty: {local_path}")
@@ -392,7 +398,7 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
         print(f"Error during slicing: {e}")
 
     
-    return success
+    return success, None
 
 
 if __name__ == "__main__":
