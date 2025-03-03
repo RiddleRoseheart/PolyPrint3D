@@ -20,16 +20,17 @@ const Navbar = ({ user, setUser }) => {
         <AppBar position="static">
             <Toolbar>
                 <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                <Button color="inherit" component={Link} to="/Landing">
-                PolyPrint 3D</Button>
+                    <Button color="inherit" component={Link} to="/Landing">
+                        PolyPrint 3D
+                    </Button>
                 </Typography>
                 {user ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {/* Clickable user name to redirect to profile */}
+                        {/* Clickable user name to redirect to profile or admin info */}
                         <Button
                             color="inherit"
                             component={Link}
-                            to="/userProfile"
+                            to={user.role === 'admin' ? "/admin" : "/userProfile"}
                             sx={{ textTransform: 'none' }} // Prevent uppercase transformation
                         >
                             <Typography variant="body1">
@@ -40,7 +41,7 @@ const Navbar = ({ user, setUser }) => {
                         <Button
                             color="inherit"
                             component={Link}
-                            to="/"
+                            to="/STLFileUpload"
                         >
                             Start Printing
                         </Button>

@@ -5,7 +5,8 @@ from backend.services.auth_service import (
     AuthService, 
     AuthError, 
     InvalidCredentialsError, 
-    UserExistsError
+    UserExistsError,
+    UserNotFoundError
 )
 from backend.database.models import User, UserRole
 from typing import Dict, Tuple
@@ -26,8 +27,19 @@ class LoginSchema(Schema):
     email = fields.Email(required=True)
     password = fields.Str(required=True)
 
+class CreateUserSchema(Schema):
+    email = fields.Email(required=True)
+    password = fields.Str(required=True)
+    name = fields.Str(required=True)
+    isAdmin = fields.Bool(required=False, default=False)
+
+class UpdateRoleSchema(Schema):
+    role = fields.Str(required=True)
+
 register_schema = RegisterSchema()
 login_schema = LoginSchema()
+create_user_schema = CreateUserSchema()
+update_role_schema = UpdateRoleSchema()
 
 def create_user_response(user: User) -> Dict:
     """Create standardized user response dictionary"""
@@ -145,6 +157,87 @@ def get_all_users() -> Tuple[Dict, int]:
         'users': [create_user_response(user) for user in users]
     })
 
+@bp.route('/api/auth/admin/users', methods=['POST'])
+@login_required
+def admin_create_user() -> Tuple[Dict, int]:
+    """
+    Create a new user (admin only)
+    
+    Expects JSON body with:
+    - email: string
+    - password: string
+    - name: string
+    - isAdmin: boolean (optional)
+    """
+    if current_user.role != UserRole.ADMIN.value:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Validate request data
+        errors = create_user_schema.validate(request.get_json())
+        if errors:
+            return jsonify({'error': 'Validation failed', 'details': errors}), 400
+
+        data = request.get_json()
+        
+        # Create user with specified role
+        user = AuthService.create_admin_user(
+            email=data['email'],
+            password=data['password'],
+            name=data['name'],
+            is_admin=data.get('isAdmin', False)
+        )
+        
+        logger.info(f"Admin created new user: {user.email} with role: {user.role}")
+        return jsonify(create_user_response(user)), 201
+
+    except UserExistsError as e:
+        return jsonify({'error': str(e)}), 409
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Admin user creation failed: {str(e)}")
+        return jsonify({'error': 'User creation failed'}), 500
+
+@bp.route('/api/auth/admin/users/<user_id>', methods=['PUT'])
+@login_required
+def update_user_role(user_id: str) -> Tuple[Dict, int]:
+    """
+    Update a user's role (admin only)
+    
+    Expects JSON body with:
+    - role: string (must be either 'user' or 'admin')
+    """
+    if current_user.role != UserRole.ADMIN.value:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Validate request data
+        errors = update_role_schema.validate(request.get_json())
+        if errors:
+            return jsonify({'error': 'Validation failed', 'details': errors}), 400
+
+        data = request.get_json()
+        role = data['role']
+        
+        # Validate role value
+        if role not in [UserRole.USER.value, UserRole.ADMIN.value]:
+            return jsonify({'error': 'Invalid role value'}), 400
+        
+        # Update user role
+        user = AuthService.update_user_role(user_id, role)
+        
+        logger.info(f"Admin updated user {user.email} role to: {role}")
+        return jsonify(create_user_response(user))
+
+    except UserNotFoundError as e:
+        return jsonify({'error': str(e)}), 404
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Update role failed: {str(e)}")
+        return jsonify({'error': 'Update failed'}), 500
+
 @bp.route('/api/auth/user', methods=['PUT'])
 @login_required
 def update_user() -> Tuple[Dict, int]:
@@ -193,3 +286,42 @@ def dev_login(user_type):
     login_user(user)
     session.permanent = True  # Make the session permanent
     return redirect('/')
+
+
+
+@bp.route('/api/auth/admin/create', methods=['POST'])
+@login_required
+def create_admin():
+    """
+    Create an admin user manually (only for existing admins)
+    
+    Expects JSON body with:
+    - email: string
+    - password: string
+    - name: string
+    """
+   
+    
+    try:
+        data = request.get_json()
+
+        # Validate request
+        if not data.get('email') or not data.get('password') or not data.get('name'):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Create admin user
+        admin_user = AuthService.create_user(
+            email=data['email'],
+            password=data['password'],
+            name=data['name'],
+            role=UserRole.ADMIN.value
+        )
+
+        logger.info(f"New admin created: {admin_user.email}")
+        return jsonify(create_user_response(admin_user)), 201
+
+    except UserExistsError:
+        return jsonify({'error': 'User already exists'}), 409
+    except Exception as e:
+        logger.error(f"Admin creation failed: {str(e)}")
+        return jsonify({'error': 'Admin creation failed'}), 500

@@ -9,7 +9,8 @@ import Landing from './components/Landing';
 import AuthPage from './components/authPage';
 import Navbar from './components/Navbar';
 import UserProfile from './components/UserProfile';
-import { getCurrentUser } from './api/endpoints/authEndpoints'; // Import the getCurrentUser function
+import AdminInfo from './components/AdminInfo'; // Import the AdminInfo component
+import { getCurrentUser } from './api/endpoints/authEndpoints'; // Make sure the path matches your actual file structure
 
 const STEPS = [
   'Upload STL File',
@@ -110,6 +111,32 @@ function App() {
         );
     }
 
+    // Protected route component for admin-only access
+    const ProtectedAdminRoute = ({ children }) => {
+        // Check if user exists and has admin role
+        if (!user || user.role !== 'admin') {
+            return <Navigate to="/Landing" />;
+        }
+        
+        return children;
+    };
+
+    // Redirect logged-in users based on their role
+    const LoginRedirect = () => {
+        // If no user is logged in, show the auth page
+        if (!user) {
+            return <Navigate to="/authPage" />;
+        }
+        
+        // If user is an admin, redirect to admin page
+        if (user.role === 'admin') {
+            return <Navigate to="/admin" />;
+        }
+        
+        // Regular users go to the landing page
+        return <Navigate to="/Landing" />;
+    };
+
     const renderCurrentStep = () => {
         if (!appState.uploadedFile) {
             return <STLFileUpload onFileUploaded={handleFileUploaded} />;
@@ -148,9 +175,40 @@ function App() {
         <Router>
             <Navbar user={user} setUser={setUser} />
             <Routes>
+                {/* Add a login redirect route */}
+                <Route path="/login-redirect" element={<LoginRedirect />} />
+                
+                {/* Admin route - protected */}
+                <Route 
+                    path="/admin" 
+                    element={
+                        <ProtectedAdminRoute>
+                            <AdminInfo />
+                        </ProtectedAdminRoute>
+                    } 
+                />
+                
                 <Route path="/Landing" element={<Landing user={user} />} />
-                <Route path="/authPage" element={<AuthPage user={user} setUser={setUser} />} />
-                <Route path="/userProfile" element={<UserProfile user={user} />} />
+                
+                <Route 
+                    path="/authPage" 
+                    element={
+                        user ? (
+                            // If user is already logged in, redirect based on role
+                            <Navigate to="/login-redirect" />
+                        ) : (
+                            <AuthPage user={user} setUser={setUser} />
+                        )
+                    } 
+                />
+                
+                <Route 
+                    path="/userProfile" 
+                    element={
+                        user ? <UserProfile user={user} /> : <Navigate to="/authPage" />
+                    } 
+                />
+                
                 <Route
                     path="/"
                     element={
