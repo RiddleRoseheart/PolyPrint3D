@@ -248,6 +248,273 @@ def setup_object_configurations(components):
     
     return object_configs
 
+def split_into_multiple_print_jobs(objects, configs, printer, build_volume, padding=10, max_attempts=5):
+    """
+    Splits objects that have the same material and color into multiple print jobs
+    when they can't all fit in a single print area.
+    
+    This function should only be used when:
+    1. All objects have the same material and color
+    2. There's only one printer with that material/color
+    3. Objects can't all fit in a single print
+    
+    Parameters:
+    - objects: list of trimesh objects
+    - configs: list of PrintObject configurations for each object
+    - printer: printer object with build_volume and other attributes
+    - build_volume: tuple of (x, y, z) dimensions
+    - padding: spacing between objects in mm
+    - max_attempts: maximum number of print jobs to try
+    
+    Returns:
+    - list of scenes, each containing a subset of objects that fit in the print area
+    """
+    # Validate that we have the special case:
+    if not objects or not configs:
+        print("No objects or configurations provided")
+        return []
+        
+    # Check if all objects have the same material and color
+    first_material = configs[0].material
+    first_color = configs[0].color
+    
+    if not all(config.material == first_material and config.color == first_color for config in configs):
+        print("This function should only be used when all objects have the same material and color")
+        return []
+    
+    # Sort objects by their base area for better packing
+    # Use zip to keep objects and configs synchronized
+    paired_data = list(zip(objects, configs))
+    paired_data.sort(
+        key=lambda pair: pair[0].bounding_box.extents[0] * pair[0].bounding_box.extents[1],
+        reverse=True
+    )
+    
+    # Unpack the sorted pairs
+    sorted_objects, sorted_configs = zip(*paired_data) if paired_data else ([], [])
+    
+    # Create scenes for each print job
+    scenes = []
+    remaining_objects = list(sorted_objects)  # Make a copy so we can remove items
+    remaining_configs = list(sorted_configs)  # Keep configs in sync
+    
+    attempt = 0
+    while remaining_objects and attempt < max_attempts:
+        attempt += 1
+        print(f"\nAttempting to create print job {attempt} of {max_attempts}")
+        
+        scene = trimesh.Scene()
+        x_pos, y_pos = 0, 0
+        max_height_in_row = 0
+        placed_indices = []
+        
+        # Try to place objects in this scene
+        for i, (obj, config) in enumerate(zip(remaining_objects, remaining_configs)):
+            # Skip objects that don't fit in the build volume at all
+            if not check_object_fits(obj, build_volume):
+                print(f"Object {config.object_id} too large for build volume, skipping")
+                continue
+                
+            # Make sure object is at origin
+            obj_copy = obj.copy()
+            obj_copy.apply_translation(-obj_copy.bounds[0])
+            
+            # Get dimensions
+            width, depth, height = obj_copy.bounding_box.extents
+            
+            # Check if we need to move to next row
+            if x_pos + width + padding > build_volume[0]:
+                x_pos = 0
+                y_pos += max_height_in_row + padding
+                max_height_in_row = 0
+                
+            # Check if object fits in Y direction
+            if y_pos + depth + padding > build_volume[1]:
+                # This object doesn't fit in current layout, try next object
+                continue
+                
+            # Place the object in the scene
+            translation = [
+                x_pos + padding,
+                y_pos + padding,
+                0  # Place directly on the build plate
+            ]
+            obj_copy.apply_translation(translation)
+            
+            # Add to scene and update position tracking
+            scene.add_geometry(obj_copy, node_name=f"obj_{config.object_id}")
+            placed_indices.append(i)
+            
+            # Update position tracking
+            x_pos += width + padding
+            max_height_in_row = max(max_height_in_row, depth)
+            
+        # If we placed any objects, save this scene
+        if placed_indices:
+            scenes.append(scene)
+            print(f"Created print job {attempt} with {len(placed_indices)} objects")
+            
+            # Remove placed objects from remaining lists
+            # Remove in reverse order to avoid index shifting
+            for idx in sorted(placed_indices, reverse=True):
+                del remaining_objects[idx]
+                del remaining_configs[idx]
+        else:
+            # If we couldn't place any objects in this iteration, we're stuck
+            print(f"Warning: Could not place any more objects after {attempt} attempts")
+            break
+    
+    # Report any remaining objects that couldn't be placed
+    if remaining_objects:
+        print(f"Warning: {len(remaining_objects)} objects could not be placed in any print job")
+    
+    return scenes
+
+def process_material_color_group(material, color, group, printers, file_manager, job_name, padding=10):
+    """
+    Process a group of objects with the same material and color.
+    Special handling for cases where objects can't all fit in one print area.
+    
+    Parameters:
+    - material: material type (string)
+    - color: color name (string)
+    - group: list of (object, config) tuples
+    - printers: list of available printers
+    - file_manager: FileManager instance
+    - job_name: name of the job
+    - padding: spacing between objects in mm
+    
+    Returns:
+    - list of file info dictionaries
+    """
+    # Find matching printer(s)
+    matching_printers = [
+        p for p in printers 
+        if p.material == material and p.color == color
+    ]
+    
+    if not matching_printers:
+        print(f"Warning: No printer found for {material} - {color}")
+        return []
+    
+    print(f"\nProcessing group for {material} - {color}")
+    objects_in_group = [obj for obj, _ in group]
+    configs_in_group = [config for _, config in group]
+    
+    output_files = []
+    
+    # Special case handling:
+    # 1. Check if all objects have the same material and color (already satisfied by grouping)
+    # 2. Check if there's only one printer with that material/color
+    # 3. Check if objects can't all fit in a single print
+    
+    printer = matching_printers[0]
+    build_volume_tuple = tuple(map(int, printer.build_volume.split(',')))
+    
+    # First try to arrange all objects
+    arranged_scene, unplaced = arrange_objects_in_print_area(
+        objects_in_group,
+        build_volume=build_volume_tuple,
+        padding=padding
+    )
+    
+    # If all objects fit, process normally
+    if not unplaced:
+        if arranged_scene.geometry:
+            # Generate unique identifier for this material/color combination
+            group_id = f"{material.lower()}_{color.lower()}"
+            
+            # Get paths for files
+            remote_path, local_path = file_manager.get_job_file_paths(job_name, 'stl', group_id)
+            local_path = Path(local_path)
+            
+            # Export STL
+            arranged_scene.export(str(local_path), file_type='stl')
+            print(f"Exported to local file: {local_path}")
+            
+            # Save to server
+            with open(local_path, 'rb') as f:
+                file_manager.save_file(f.read(), remote_path)
+            
+            output_files.append({
+                'path': str(local_path),
+                'printer': printer,
+                'material': material,
+                'color': color
+            })
+        
+        return output_files
+    
+    # Special case: objects don't all fit AND only one printer with the material/color
+    if len(matching_printers) == 1 and unplaced:
+        print(f"Special case detected: Objects with {material}-{color} can't fit in one print job")
+        print(f"Splitting into multiple print jobs...")
+        
+        # Split into multiple print jobs
+        scenes = split_into_multiple_print_jobs(
+            objects_in_group,
+            configs_in_group,
+            printer,
+            build_volume_tuple,
+            padding=padding
+        )
+        
+        # Process each print job
+        for i, scene in enumerate(scenes, 1):
+            if scene.geometry:
+                # Generate unique identifier for this batch
+                group_id = f"{material.lower()}_{color.lower()}_batch{i}"
+                
+                # Get paths for files
+                remote_path, local_path = file_manager.get_job_file_paths(job_name, 'stl', group_id)
+                local_path = Path(local_path)
+                
+                # Export STL
+                scene.export(str(local_path), file_type='stl')
+                print(f"Exported batch {i} to local file: {local_path}")
+                
+                # Save to server
+                with open(local_path, 'rb') as f:
+                    file_manager.save_file(f.read(), remote_path)
+                
+                output_files.append({
+                    'path': str(local_path),
+                    'printer': printer,
+                    'material': material,
+                    'color': color,
+                    'batch': i
+                })
+    else:
+        # Standard case with unplaced objects but multiple printers available
+        # Just process what fits and warn about the rest
+        if arranged_scene.geometry:
+            # Generate unique identifier for this material/color combination
+            group_id = f"{material.lower()}_{color.lower()}"
+            
+            # Get paths for files
+            remote_path, local_path = file_manager.get_job_file_paths(job_name, 'stl', group_id)
+            local_path = Path(local_path)
+            
+            # Export STL
+            arranged_scene.export(str(local_path), file_type='stl')
+            print(f"Exported to local file: {local_path}")
+            
+            # Save to server
+            with open(local_path, 'rb') as f:
+                file_manager.save_file(f.read(), remote_path)
+            
+            output_files.append({
+                'path': str(local_path),
+                'printer': printer,
+                'material': material,
+                'color': color
+            })
+            
+        if unplaced:
+            print(f"Warning: {len(unplaced)} objects could not be placed for {material} - {color}")
+    
+    return output_files
+
 def split_and_distribute_objects(input_path, file_manager, job_name, build_volume=BUILD_VOLUME,
                                volume_threshold=0.001, min_faces=4, padding=10):
     """Splits an STL into naturally separated objects and distributes them by material/color."""
@@ -289,57 +556,24 @@ def split_and_distribute_objects(input_path, file_manager, job_name, build_volum
     job_folders = file_manager.create_job_folders(job_name)
     output_files = []
     
-    # Process each material/color group
+    # Get printers
     printers = get_available_printers_from_service()
+    
+    # Process each material/color group
     for (material, color), group in material_color_groups.items():
-        # Find matching printer
-        matching_printer = next(
-            (p for p in printers if p.material == material and p.color == color),
-            None
-        )
-        
-        if not matching_printer:
-            print(f"Warning: No printer found for {material} - {color}")
-            continue
-            
-        print(f"\nProcessing group for {material} - {color} (Printer {matching_printer.id})")
-        objects_in_group = [obj for obj, _ in group]
-        
-         # Convert the build_volume string to a tuple of integers
-        build_volume_tuple = tuple(map(int, matching_printer.build_volume.split(',')))
-
-        # Arrange objects for this group
-        arranged_scene, unplaced = arrange_objects_in_print_area(
-            objects_in_group, 
-            build_volume=build_volume_tuple,
+        # Process this material/color group, potentially splitting into multiple files
+        group_files = process_material_color_group(
+            material, 
+            color, 
+            group, 
+            printers, 
+            file_manager, 
+            job_name, 
             padding=padding
         )
         
-        if arranged_scene.geometry:
-            # Generate unique identifier for this material/color combination
-            group_id = f"{material.lower()}_{color.lower()}"
-            
-            # Get paths for files
-            remote_path, local_path = file_manager.get_job_file_paths(job_name, 'stl', group_id)
-            local_path = Path(local_path)
-            
-            # Export STL
-            arranged_scene.export(str(local_path), file_type='stl')
-            print(f"Exported to local file: {local_path}")
-            
-            # Save to server
-            with open(local_path, 'rb') as f:
-                file_manager.save_file(f.read(), remote_path)
-            
-            output_files.append({
-                'path': str(local_path),
-                'printer': matching_printer,
-                'material': material,
-                'color': color
-            })
-        
-        if unplaced:
-            print(f"Warning: {len(unplaced)} objects could not be placed for {material} - {color}")
+        # Add all output files to our master list
+        output_files.extend(group_files)
     
     return output_files
 
@@ -409,7 +643,7 @@ if __name__ == "__main__":
         
         job_name = file_manager.generate_unique_folder_name()
         
-        input_stl = "backend/slicer/input/Pelletcamv2.1.stl"
+        input_stl = "backend/slicer/input/group_pla_red.3mf"
         config_path = "backend/slicer/config/config.ini"
         
         print("Starting processing...")
