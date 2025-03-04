@@ -4,11 +4,11 @@
 #@apiKey = N9BjnWFdBOGCAhNlF9EmepEJ6PAklXDye0pEhRUBYxs
 
 # printer 2
-@ip = 192.168.1.8
-@apiKey = XXTbEpJhyc7DglBQcxzodvch3YbmeJl9Uv6R6PHhgfY
+#@ip = 192.168.1.8
+#@apiKey = XXTbEpJhyc7DglBQcxzodvch3YbmeJl9Uv6R6PHhgfY
 
 # printer 3
-#@ip = 192.168.1.9
+#@ip = 192.168.1.9:80
 #@apiKey = 0sEcfqbyAUqaBX-LySJAHY7xANs-_ge1_L7JnpdWz4Y
 
 # printer 4
@@ -16,8 +16,8 @@
 #@apiKey = LwkjwuybUCIRZIbdaaQ3UGRykEAyOP6nGkp6MJphzX4
 
 #printer home
-#@ip = 10.0.0.254
-#@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+@ip = 10.0.0.18
+@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
 @path = C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode.
 
 # Test the root endpoint

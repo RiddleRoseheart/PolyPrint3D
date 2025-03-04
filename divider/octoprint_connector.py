@@ -24,11 +24,7 @@ def connect_octoprint(ip: str, api_key: str) -> None:
         'Content-Type': 'application/json'
     }
     data = {
-        "command": "connect",
-        "port": "/dev/ttyUSB0",
-        "baudrate": 115200,
-        "save": True,
-        "autoconnect": True
+        "command": "connect"
     }
     if is_octoprint_server(ip=ip, api_key=api_key):
         response = requests.post(url=url, headers=headers, json=data)

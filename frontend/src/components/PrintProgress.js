@@ -1,5 +1,6 @@
 // onyl simulation of print progress // todo 
 import React, { useState, useEffect, useCallback } from 'react';
+import { getPrintJobDetails } from './tempDivider';
 import { 
     Box, 
     Paper, 
@@ -27,53 +28,64 @@ const PrintingProgress = ({ selectedFiles, onReset }) => {
     const [notifications, setNotifications] = useState([]);
 
     // Initialize print jobs with settings
-    const initializePrintJobs = useCallback(() => {
-        const jobs = selectedFiles.map((file, index) => ({
-            id: `print_${Date.now()}_${Math.random()}`,
-            fileName: file.name || `Print_${index + 1}.stl`,
-            printer: `Printer ${(index % 3) + 1}`,
-            status: 'PRINTING',
-            progress: 0,
-            isPaused: false,
-            estimatedTime: 30 + (Math.random() * 30),
-            timeRemaining: 30,
-            startTime: new Date(),
-            printVariables: {
-                material: file.material || 'PLA',
-                quality: file.quality || '0.2mm',
-                infill: file.infill || '20%',
-                temperature: '200°C',
-                bedTemp: '60°C'
-            }
-        }));
+    const initializePrintJobs = useCallback(async () => {
+        try {
+            const jobs = await Promise.all(selectedFiles.map(async (file, index) => {
+                const jobDetails = await getPrintJobDetails(ip, apiKey);
+                return {
+                    id: `print_${Date.now()}_${Math.random()}`,
+                    fileName: file.name || `Print_${index + 1}.stl`,
+                    printer: `Printer ${(index % 3) + 1}`,
+                    status: jobDetails.state,
+                    progress: jobDetails.completion,
+                    isPaused: false,
+                    estimatedTime: 30 + (Math.random() * 30),
+                    timeRemaining: jobDetails.printTimeLeft / 60, // Convert seconds to minutes
+                    startTime: new Date(),
+                    printVariables: {
+                        material: file.material || 'PLA',
+                        quality: file.quality || '0.2mm',
+                        infill: file.infill || '20%',
+                        temperature: '200°C',
+                        bedTemp: '60°C'
+                    }
+                };
+            }));
 
-        setPrintJobs(jobs);
-    }, [selectedFiles]);
+            setPrintJobs(jobs);
+        } catch (error) {
+            console.error('Error initializing print jobs:', error);
+        }
+    }, [selectedFiles, ip, apiKey]);
 
     // Update progress for active prints
-    const updateJobProgress = useCallback(() => {
-        setPrintJobs(prev => prev.map(job => {
-            if (job.status === 'COMPLETED' || job.isPaused) return job;
+    const updateJobProgress = useCallback(async () => {
+        try {
+            const updatedJobs = await Promise.all(printJobs.map(async (job) => {
+                if (job.status === 'COMPLETED' || job.isPaused) return job;
 
-            const newProgress = Math.min(job.progress + 1, 100);
-            const newStatus = newProgress === 100 ? 'COMPLETED' : 'PRINTING';
-            const newTimeRemaining = Math.max(
-                0, 
-                job.estimatedTime * (100 - newProgress) / 100
-            );
+                const jobDetails = await getPrintJobDetails(ip, apiKey);
+                const newProgress = jobDetails.completion;
+                const newStatus = newProgress === 100 ? 'COMPLETED' : jobDetails.state;
+                const newTimeRemaining = jobDetails.printTimeLeft / 60; // Convert seconds to minutes
 
-            if (newProgress === 100) {
-                addNotification(`Print completed: ${job.fileName}`);
-            }
+                if (newProgress === 100) {
+                    addNotification(`Print completed: ${job.fileName}`);
+                }
 
-            return { 
-                ...job, 
-                progress: newProgress, 
-                status: newStatus,
-                timeRemaining: newTimeRemaining
-            };
-        }));
-    }, []);
+                return {
+                    ...job,
+                    progress: newProgress,
+                    status: newStatus,
+                    timeRemaining: newTimeRemaining
+                };
+            }));
+
+            setPrintJobs(updatedJobs);
+        } catch (error) {
+            console.error('Error updating job progress:', error);
+        }
+    }, [printJobs, ip, apiKey]);
 
     // Initialize jobs on component mount
     useEffect(() => {
