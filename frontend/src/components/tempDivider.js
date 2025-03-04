@@ -274,7 +274,7 @@ async function testFunctions() {
 }
 
 // Call the test function
-testFunctions();
+// testFunctions();
 
 // Exporting the functions
 export {
