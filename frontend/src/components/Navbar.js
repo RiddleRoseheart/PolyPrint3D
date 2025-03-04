@@ -20,13 +20,32 @@ const Navbar = ({ user, setUser }) => {
         <AppBar position="static">
             <Toolbar>
                 <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                    PolyPrint 3D
+                    <Button color="inherit" component={Link} to="/Landing">
+                        PolyPrint 3D
+                    </Button>
                 </Typography>
                 {user ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="body1">
-                            Welcome, {user.name}!
-                        </Typography>
+                        {/* Clickable user name to redirect to profile or admin info */}
+                        <Button
+                            color="inherit"
+                            component={Link}
+                            to={user.role === 'admin' ? "/admin" : "/userProfile"}
+                            sx={{ textTransform: 'none' }} // Prevent uppercase transformation
+                        >
+                            <Typography variant="body1">
+                                Welcome, {user.name}!
+                            </Typography>
+                        </Button>
+                        {/* "Start Printing" button */}
+                        <Button
+                            color="inherit"
+                            component={Link}
+                            to="/STLFileUpload"
+                        >
+                            Start Printing
+                        </Button>
+                        {/* Logout button */}
                         <Button
                             color="inherit"
                             onClick={handleLogout}
