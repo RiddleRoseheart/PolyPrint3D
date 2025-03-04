@@ -485,9 +485,42 @@ def upload_file(ip: str, api_key: str, path:str)-> str | None:
     except Exception as e:
         logger.error(f"failed to upload file ({path}) because: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload to the OctoPrint server.")
-@app.post("/select_file")
+@app.post("/select_file", responses={
+    200: {
+        "description": "File selected successfully",
+        "content": {
+            "application/json": {
+                "example": {"message": "File selected successfully."}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to select file on OctoPrint server."}
+            }
+        }
+    }
+})
 def select_file(ip: str, api_key: str, name: str):
-    post_select_file(ip=ip, api_key=api_key, name=name)
+    if not is_octoprint_server(ip, api_key):
+        raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
+    try:
+        post_select_file(ip=ip, api_key=api_key, name=name)
+        return {"message": "File selected successfully."}
+    except Exception as e:
+        logger.error(f"Failed to select file: {e}")
+        raise HTTPException(status_code=500, detail="Failed to select file on OctoPrint server.")
+
 def is_valid_path(path: str) -> bool:
     return os.path.exists(path) and os.path.isfile(path)
 
@@ -530,6 +563,119 @@ def start_print_job(ip: str, api_key: str):
         logger.error(f"Failed to start print job: {e}")
         raise HTTPException(status_code=500, detail="Failed to start print job on OctoPrint server.")
 
+@app.post("/job/cancel", responses={
+    200: {
+        "description": "Print job cancelled successfully",
+        "content": {
+            "application/json": {
+                "example": {"message": "Print job cancelled successfully."}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to cancel print job on OctoPrint server."}
+            }
+        }
+    }
+})
+def cancel_print_job(ip: str, api_key: str):
+    if not is_octoprint_server(ip, api_key):
+        raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
+    try:
+        response = cancel_print(ip, api_key)
+        if response.status_code == 204:
+            return {"message": "Print job cancelled successfully."}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to cancel print job on OctoPrint server.")
+    except Exception as e:
+        logger.error(f"Failed to cancel print job: {e}")
+
+@app.post("/job/pause", responses={
+          200: {
+        "description": "Print job paused successfully",
+        "content": {
+            "application/json": {
+                "example": {"message": "Print job paused successfully."}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to pause print job on OctoPrint server."}
+            }
+        }
+    }
+})
+def pause_print_job(ip: str, api_key: str):
+    if not is_octoprint_server(ip, api_key):
+        raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
+    try:
+        response = pause_print(ip, api_key)
+        if response.status_code == 204:
+            return {"message": "Print job paused successfully."}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to pause print job on OctoPrint server.")
+    except Exception as e:
+        logger.error(f"Failed to pause print job: {e}")
+
+@app.post("/job/resume", responses={
+    200: {
+        "description": "Print job resumed successfully",
+        "content": {
+            "application/json": {
+                "example": {"message": "Print job resumed successfully."}
+            }
+        }
+    },
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "example": {"detail": "IP is not an OctoPrint server or incorrect API key."}
+            }
+        }
+    },
+    500: {
+        "description": "Internal server error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Failed to resume print job on OctoPrint server."}
+            }
+        }
+    }
+})
+def resume_print_job(ip: str, api_key: str):
+    if not is_octoprint_server(ip, api_key):
+        raise HTTPException(status_code=400, detail="IP is not an OctoPrint server or incorrect API key.")
+    try:
+        response = resume_print(ip, api_key)
+        if response.status_code == 204:
+            return {"message": "Print job resumed successfully."}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to resume print job on OctoPrint server.")
+    except Exception as e:
+        logger.error(f"Failed to resume print job: {e}")
 import uvicorn
 
 if __name__ == "__main__":

@@ -32,9 +32,9 @@ class PrintRequest(db.Model):
     file_path = db.Column(db.String(255), nullable=False)
     original_file_id = db.Column(db.String(36), db.ForeignKey('uploaded_file.id'), nullable=False)
     #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)  
-    dimension = db.Column(db.String(255)) # Build volume dimensions
-    filling = db.Column(db.Integer)       # Infill percentage
-    layer_height = db.Column(db.Float)    # Layer height in mm
+    dimension = db.Column(db.String(255)) 
+    filling = db.Column(db.Integer)      
+    layer_height = db.Column(db.Float)   
     state = db.Column(db.String(50))     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
@@ -45,7 +45,7 @@ class PrintRequest(db.Model):
     # Relationships
     original_file = db.relationship('UploadedFile', back_populates='print_requests')
     gcode_file = db.relationship('GCodeFile', back_populates='print_request', uselist=False)
-    filaments = db.relationship('Filament', back_populates='print_request')
+    filaments = db.relationship('Filament', back_populates='print_request', foreign_keys='Filament.print_request_id')
     user = db.relationship('User', back_populates='print_requests')
     printer = db.relationship('Printer', back_populates='print_requests')
     
@@ -74,7 +74,7 @@ class Filament(db.Model):
     printer_id = db.Column(db.String(36), db.ForeignKey('printer.id'), nullable=True)
       
     # Relationships
-    print_request = db.relationship('PrintRequest', back_populates='filaments')
+    print_request = db.relationship('PrintRequest', back_populates='filaments',  foreign_keys='Filament.print_request_id')
     color = db.relationship('Color', back_populates='filaments', uselist=False)
     material = db.relationship('Material', back_populates='filaments', uselist=False)
     printer = db.relationship('Printer', back_populates='filaments')
@@ -132,6 +132,10 @@ class Printer(db.Model):
     is_available = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_status_check = db.Column(db.DateTime)
+
+    material = db.Column(db.String(50), nullable=True)
+    color = db.Column(db.String(50), nullable=True)
+    build_volume = db.Column(db.String(50), default='250,210,210')  # Add this line
     
     
     # Relationships
