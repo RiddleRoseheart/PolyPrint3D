@@ -191,19 +191,6 @@ class AuthService:
             raise
 
     @staticmethod
-    def delete_user(user: User) -> bool:
-        """Delete a user"""
-        try:
-            db.session.delete(user)
-            db.session.commit()
-            logger.info(f"Deleted user: {user.id}")
-            return True
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to delete user: {str(e)}")
-            raise
-
-    @staticmethod
     def get_all_users() -> List[User]:
         """Get all users (admin function)"""
         return User.query.all()
@@ -273,3 +260,37 @@ class AuthService:
             name=name,
             role=role
         )
+    
+    @staticmethod
+    def delete_user(user: User) -> bool:
+        """Delete a user using direct SQL to bypass SQLAlchemy's cascading"""
+        try:
+            from sqlalchemy import text
+            from backend.database.config import db
+            
+            # Get the user_id for our SQL operations
+            user_id = user.id
+            
+            # Delete directly in database without trying to load associations
+            # First delete associated print requests
+            db.session.execute(
+                text("DELETE FROM print_request WHERE user_id = :user_id"), 
+                {"user_id": user_id}
+            )
+            
+            # Then delete the user directly with SQL
+            db.session.execute(
+                text("DELETE FROM user WHERE id = :user_id"),
+                {"user_id": user_id}
+            )
+            
+            # Commit the transaction
+            db.session.commit()
+            
+            logger.info(f"Deleted user: {user_id}")
+            return True
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to delete user: {str(e)}")
+            raise
