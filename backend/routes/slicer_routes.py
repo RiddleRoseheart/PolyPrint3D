@@ -9,6 +9,7 @@ from backend.services.notification_service import NotificationService
 import os
 from backend.database.models import PrintRequest, UploadedFile
 import uuid
+from backend.database import db
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('slicer', __name__)
