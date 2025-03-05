@@ -41,7 +41,7 @@ const Navbar = ({ user, setUser }) => {
                         <Button
                             color="inherit"
                             component={Link}
-                            to="/STLFileUpload"
+                            to="/"
                         >
                             Start Printing
                         </Button>

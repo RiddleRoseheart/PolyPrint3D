@@ -325,3 +325,57 @@ def create_admin():
     except Exception as e:
         logger.error(f"Admin creation failed: {str(e)}")
         return jsonify({'error': 'Admin creation failed'}), 500
+    
+@bp.route('/api/auth/admin/users/<user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id: str) -> Tuple[Dict, int]:
+    """
+    Delete a user (admin only)
+    """
+    if current_user.role != UserRole.ADMIN.value:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Get user by ID
+        user = AuthService.get_user_by_id(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        # Don't allow deleting yourself
+        if user.id == current_user.id:
+            return jsonify({'error': 'Cannot delete your own account'}), 400
+        
+        # Delete the user
+        AuthService.delete_user(user)
+        
+        logger.info(f"Admin deleted user: {user.email}")
+        return jsonify({'message': 'User deleted successfully'})
+
+    except Exception as e:
+        logger.error(f"Delete user failed: {str(e)}")
+        return jsonify({'error': 'Delete failed'}), 500
+    
+
+@bp.route('/api/auth/user/delete', methods=['DELETE'])
+@login_required
+def delete_own_account() -> Tuple[Dict, int]:
+    """
+    Delete the current user's own account
+    """
+    try:
+        user_id = current_user.id
+        user_email = current_user.email
+        
+        # Execute the deletion
+        AuthService.delete_user(current_user)
+        
+        # Log out the user
+        logout_user()
+        session.clear()
+        
+        logger.info(f"User deleted their own account: {user_email}")
+        return jsonify({'message': 'Account deleted successfully'})
+
+    except Exception as e:
+        logger.error(f"Self account deletion failed: {str(e)}")
+        return jsonify({'error': 'Delete failed'}), 500

@@ -10,7 +10,10 @@ import {
     Paper,
     Link,
     Alert,
-    CircularProgress
+    CircularProgress,
+    List,
+    ListItem,
+    ListItemText
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,28 +22,27 @@ const AuthPage = ({ user, setUser }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
-    const [error, setError] = useState(null);
+    const [errors, setErrors] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        setError(null);
-        
+        setErrors([]);
+
         try {
             const userData = await login({ email, password });
             setUser(userData);
-            
+
             // Role-based redirection
             if (userData.role === 'admin') {
-                navigate('/admin'); // Redirect admins to admin dashboard
+                navigate('/admin');
             } else {
-                navigate('/Landing'); // Redirect regular users to landing page
+                navigate('/Landing');
             }
         } catch (error) {
-            handleError(error);
-            setError('Login failed. Please check your credentials.');
+            setErrors([error.message || 'Login failed. Please check your credentials.']);
         } finally {
             setIsLoading(false);
         }
@@ -49,17 +51,14 @@ const AuthPage = ({ user, setUser }) => {
     const handleRegister = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        setError(null);
-        
+        setErrors([]);
+
         try {
             const userData = await register({ email, password, name });
             setUser(userData);
-            
-            // New users are typically regular users, so redirect to landing
             navigate('/Landing');
         } catch (error) {
-            handleError(error);
-            setError('Registration failed. Please try again.');
+            setErrors([error.message || 'Registration failed. Please try again.']);
         } finally {
             setIsLoading(false);
         }
@@ -67,24 +66,22 @@ const AuthPage = ({ user, setUser }) => {
 
     const handleLogout = async () => {
         setIsLoading(true);
-        setError(null);
-        
+        setErrors([]);
+
         try {
             await logout();
             setUser(null);
             navigate('/Landing');
         } catch (error) {
-            handleError(error);
-            setError('Logout failed. Please try again.');
+            setErrors([error.message || 'Logout failed. Please try again.']);
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Clear form fields when toggling between login and register
     const toggleAuthMode = () => {
         setIsLogin(!isLogin);
-        setError(null);
+        setErrors([]);
         setEmail('');
         setPassword('');
         if (isLogin) {
@@ -99,7 +96,17 @@ const AuthPage = ({ user, setUser }) => {
                     {isLogin ? 'Login' : 'Register'}
                 </Typography>
 
-                {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+                {errors.length > 0 && (
+                    <Alert severity="error" sx={{ mb: 3 }}>
+                        <List dense>
+                            {errors.map((error, index) => (
+                                <ListItem key={index}>
+                                    <ListItemText primary={error} />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Alert>
+                )}
 
                 <form onSubmit={isLogin ? handleLogin : handleRegister}>
                     {!isLogin && (
@@ -180,16 +187,7 @@ const AuthPage = ({ user, setUser }) => {
                     </Box>
                 </form>
 
-                <Box sx={{ mt: 2, textAlign: 'center' }}>
-                    <Link
-                        component="button"
-                        variant="body2"
-                        onClick={toggleAuthMode}
-                        disabled={isLoading}
-                    >
-                        {isLogin ? "Don't have an account? Register here" : "Already have an account? Login here"}
-                    </Link>
-                </Box>
+                
             </Paper>
         </Container>
     );
