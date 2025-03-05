@@ -187,16 +187,7 @@ const AuthPage = ({ user, setUser }) => {
                     </Box>
                 </form>
 
-                <Box sx={{ mt: 2, textAlign: 'center' }}>
-                    <Link
-                        component="button"
-                        variant="body2"
-                        onClick={toggleAuthMode}
-                        disabled={isLoading}
-                    >
-                        {isLogin ? "Don't have an account? Register here" : "Already have an account? Login here"}
-                    </Link>
-                </Box>
+                
             </Paper>
         </Container>
     );
