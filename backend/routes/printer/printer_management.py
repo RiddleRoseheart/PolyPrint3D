@@ -16,7 +16,14 @@ def create_printer_response(printer) -> Dict:
         'id': printer.id,
         'name': printer.name,
         'status': printer.status,
-        'ip_address': printer.ip_address
+        'ip_address': printer.ip_address,
+        'api_key': printer.api_key,
+        'is_available': printer.is_available,
+        'created_at': printer.created_at,
+        'last_status_check': printer.last_status_check,
+        'material': printer.material,  
+        'color': printer.color,
+        'build_volume': printer.build_volume
     }
 
 @bp.route('/api/printers', methods=['GET'])
@@ -115,3 +122,4 @@ def get_printer_status(printer_id: str) -> Tuple[Dict, int]:
     except Exception as e:
         logger.error(f"Error getting printer status: {str(e)}")
         return jsonify({'error': 'Failed to get printer status'}), 500
+        

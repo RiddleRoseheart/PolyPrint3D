@@ -97,16 +97,17 @@ const STLFileUpload = ({ onFileUploaded }) => {
       formData.append('file', uploadState.selectedFile);
 
       const response = await uploadSTLFile(formData);
+      console.log('Upload response in component:', response);
       
+      const fileData = response.status === 'success' ? response.data : response;
+
+      if (!fileData || !fileData.id) {
+        throw new Error('Invalid response format from server');
+      }
+
       setUploadState(prev => ({ ...prev, progress: 100 }));
       
-      onFileUploaded({
-        id: response.id,
-        filename: response.filename,
-        status: response.status,
-        created_at: response.created_at,
-        updated_at: response.updated_at
-      });
+      onFileUploaded(fileData);
 
       resetForm();
 
@@ -137,7 +138,31 @@ const STLFileUpload = ({ onFileUploaded }) => {
     return (bytes / 1024 / 1024).toFixed(UPLOAD_CONFIG.SIZE_DISPLAY_DECIMALS);
   };
 
-  return (
+  return (       
+    <>
+    {/* Requirements Box */}
+    <Box 
+      sx={{ 
+        maxWidth: 600, 
+        mx: 'auto', 
+        mt: 4, 
+        p: 3, 
+        bgcolor: '#f5f5f5', 
+        borderRadius: 1 
+      }}
+    >
+      <Typography variant="h6" gutterBottom textAlign={'center'}>
+        Bestandsvereisten
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        - Voor een <strong>best mogelijke uitkomst</strong>, upload een bestand van het type <strong>.STL</strong>.<br />
+        - Hoewel we meerdere bestandsformaten kunnen accepteren, zijn deze minder getest.<br />
+        - Zorg ervoor dat de objecten elkaar <strong>niet overlappen</strong>, zodat de slicer ze correct kan detecteren en verdelen.<br />
+        - Alle objecten moeten <strong>in de juiste printpositie</strong> staan. Onze software past dit niet aan.<br />
+        - Controleer dat objecten <strong>voldoende steunpalen/support</strong> hebben waar nodig. Onze software voegt dit niet automatisch toe.<br />
+      </Typography>
+    </Box>
+       
     <Paper elevation={3} sx={{ p: 3, maxWidth: 600, mx: 'auto', mt: 4 }}>
       <Box sx={{ textAlign: 'center' }}>
         <input
@@ -214,6 +239,7 @@ const STLFileUpload = ({ onFileUploaded }) => {
         )}
       </Box>
     </Paper>
+    </>
   );
 };
 

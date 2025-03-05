@@ -68,9 +68,92 @@ export const getCurrentUser = async () => {
     }
 };
 
+/**
+ * Admin: Get all users
+ * @returns {Promise<Object>} List of all users
+ * @throws {Error} If retrieval fails or user is not admin
+ */
+export const getAllUsers = async () => {
+    try {
+        const response = await axiosInstance.get('/api/auth/admin/users');
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Admin: Create a new user (with optional admin role)
+ * @param {Object} userData - User data
+ * @param {string} userData.email - User's email
+ * @param {string} userData.password - User's password
+ * @param {string} userData.name - User's name
+ * @param {boolean} userData.isAdmin - Whether the user should have admin role
+ * @returns {Promise<Object>} Created user data
+ * @throws {Error} If creation fails or current user is not admin
+ */
+export const createUser = async (userData) => {
+    try {
+        const response = await axiosInstance.post('/api/auth/admin/users', userData);
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Admin: Update a user's role
+ * @param {string} userId - ID of user to update
+ * @param {Object} updateData - Update data
+ * @param {string} updateData.role - New role for the user
+ * @returns {Promise<Object>} Updated user data
+ * @throws {Error} If update fails or current user is not admin
+ */
+export const updateUserRole = async (userId, updateData) => {
+    try {
+        const response = await axiosInstance.put(`/api/auth/admin/users/${userId}`, updateData);
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Admin: Delete a user
+ * @param {string} userId - ID of user to delete
+ * @returns {Promise<Object>} Deletion response data
+ * @throws {Error} If deletion fails or current user is not admin
+ */
+export const deleteUser = async (userId) => {
+    try {
+        const response = await axiosInstance.delete(`/api/auth/admin/users/${userId}`);
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
+
+/**
+ * Delete user's own account
+ * @returns {Promise<Object>} Deletion response data
+ * @throws {Error} If deletion fails
+ */
+export const deleteOwnAccount = async () => {
+    try {
+        const response = await axiosInstance.delete('/api/auth/user/delete');
+        return response.data;
+    } catch (error) {
+        handleError(error);
+    }
+};
 export default {
     register,
     login,
     logout,
-    getCurrentUser
+    getCurrentUser,
+    getAllUsers,
+    createUser,
+    updateUserRole,
+    deleteUser,
+    deleteOwnAccount
 };

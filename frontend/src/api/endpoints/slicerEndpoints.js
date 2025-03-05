@@ -1,5 +1,6 @@
 import axiosInstance from '../axiosConfig';
 import { handleError } from '../../utils/errorHandler';
+import { processResponse } from './adapter';
 
 /**
  * API endpoints for slicing operations
@@ -23,11 +24,12 @@ export const sliceSTLFile = async (fileId, settings = {}) => {
             globalSettings: settings.globalSettings || {},
             objects: settings.objects || []
         });
-        return response.data;
+        return processResponse(response.data);
     } catch (error) {
         handleError(error);
     }
 };
+
 /**
  * Get all print requests for current user
  * @returns {Promise<Object>} List of print requests
@@ -36,7 +38,7 @@ export const sliceSTLFile = async (fileId, settings = {}) => {
 export const getPrintRequests = async () => {
     try {
         const response = await axiosInstance.get('/api/slicer/requests');
-        return response.data;
+        return processResponse(response.data);
     } catch (error) {
         handleError(error);
     }
@@ -51,7 +53,7 @@ export const getPrintRequests = async () => {
 export const getPrintRequest = async (requestId) => {
     try {
         const response = await axiosInstance.get(`/api/slicer/requests/${requestId}`);
-        return response.data;
+        return processResponse(response.data);
     } catch (error) {
         handleError(error);
     }
@@ -72,36 +74,71 @@ export const deletePrintRequest = async (requestId) => {
 };
 
 /**
- * Get available materials
- * @returns {Promise<Object>} Materials and their properties
+ * Get available colors 
+ * @param {string} materialId - Optional material ID to filter by
+ * @returns {Promise<Object>} Colors and their hex codes
  */
-export const getMaterials = async () => {
+export const getColors = async (materialId = null) => {
     try {
-        const response = await axiosInstance.get('/api/slicer/materials');
-        return response.data;
+        let url = '/api/slicer/colors';
+        if (materialId) {
+            url += `?material_id=${materialId}`;
+        }
+        const response = await axiosInstance.get(url);
+        return processResponse(response.data);
     } catch (error) {
         handleError(error);
+        return {}; }
+};
+
+/**
+ * Get available materials
+ * @param {string} printerId - Optional printer ID to filter by
+ * @returns {Promise<Object>} Materials and their properties
+ */
+export const getMaterials = async (printerId = null) => {
+    try {
+        let url = '/api/slicer/materials';
+        if (printerId) {
+            url += `?printer_id=${printerId}`;
+        }
+        const response = await axiosInstance.get(url);
+        return processResponse(response.data);
+    } catch (error) {
+        handleError(error);
+        return {}; 
     }
 };
 
 /**
- * Get available colors
- * @returns {Promise<Object>} Colors and their hex codes
+ * Download G-code file for a print request
+ * @param {string} requestId - ID of the print request
+ * @returns {Promise<Blob>} G-code content as binary data
+ * @throws {Error} If download fails
  */
-export const getColors = async () => {
+export const downloadGcode = async (requestId) => {
     try {
-        const response = await axiosInstance.get('/api/slicer/colors');
+        const response = await axiosInstance.get(`/api/slicer/download/${requestId}`, {
+            responseType: 'blob',
+            headers: {
+                'Accept': 'application/octet-stream'
+            }
+        });
         return response.data;
     } catch (error) {
         handleError(error);
     }
 };
 
-export default {
+
+const slicerEndpoints = {
     sliceSTLFile,
     getPrintRequests,
     getPrintRequest,
     deletePrintRequest,
     getMaterials,
-    getColors
+    getColors,
+    downloadGcode
 };
+
+export default slicerEndpoints;
