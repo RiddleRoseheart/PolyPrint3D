@@ -64,7 +64,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                 const file = new File([blob], fileData.filename, { type: 'application/octet-stream' });
                 setStlFile(file);
                 
-                                // Analyze STL file to get object count
+                // Analyze STL file to get object count
                 const analysisResult = await analyzeSTLFile(fileData.id);
 
                 // Add debugging
@@ -97,7 +97,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
         loadDataAndAnalyze();
     }, [fileData]);
 
-    // Three.js preview setup (keep your existing code)
+    // Three.js preview setup
     useEffect(() => {
         if (!stlFile || !mountRef.current) return;
 
@@ -208,7 +208,6 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
         setError('');
         
         try {
-            //whats being send to backend
             console.log('Sending slicing request with configurations:', {
                 fileId: fileData.id,
                 globalSettings: {
@@ -218,7 +217,6 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                 objects: objectSettings
             });
 
-            // Send the object configurations to the backend
             const response = await sliceSTLFile(fileData.id, {
                 globalSettings: {
                     infill: printSettings.infill,
@@ -238,9 +236,10 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
 
     return (
         <Stack spacing={3} sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
+            {/* Main preview section */}
             <Paper elevation={3} sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>
-                    Preview and Global Settings
+                    3D Model Preview
                 </Typography>
 
                 {error && (
@@ -271,8 +270,15 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                         }} 
                     />
                 )}
+            </Paper>
 
-                <Stack spacing={2} direction={{ xs: 'column', md: 'row' }} sx={{ mb: 2 }}>
+            {/* Global settings section */}
+            <Paper elevation={3} sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                    Global Print Settings
+                </Typography>
+
+                <Stack spacing={2} direction={{ xs: 'column', md: 'row' }}>
                     <FormControl fullWidth>
                         <InputLabel>Quality</InputLabel>
                         <Select
@@ -305,6 +311,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                 </Stack>
             </Paper>
             
+            {/* Object settings section */}
             {isAnalyzing ? (
                 <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
                     <CircularProgress size={24} sx={{ mr: 2 }} />
@@ -318,9 +325,11 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                     onObjectsChange={setObjectSettings}
                     materials={materials}
                     colors={colors}
+                    setColors={setColors}
                 />
             )}
             
+            {/* Submit button */}
             <LoadingButton
                 loading={isLoading || isAnalyzing}
                 variant="contained"

@@ -8,7 +8,7 @@ from flask import current_app
 from backend.utils import PathUtil
 from backend.slicer.scripts.file_manager import FileManager
 from backend.database.config import db
-from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User, Filament
+from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User, Filament, Material, Color
 from backend.slicer.scripts.slicer import split_and_distribute_objects, slice_with_prusa_slicer
 from backend.slicer.config.material_config import AVAILABLE_MATERIALS, AVAILABLE_COLORS
 from backend.services.notification_service import NotificationService
@@ -112,12 +112,17 @@ class SlicerService:
                 global_settings=global_settings
             )
             
+            material = Material.query.filter_by(name=file_info['material']).first()
+            color = Color.query.filter_by(name=file_info['color']).first()
+            
             # Create Filament record
             filament = Filament(
                 id=str(uuid.uuid4()), 
                 name=f"{file_info['material']} {file_info['color']}",
-                price_per_gram=25.0, #TODO
-                print_request_id=print_request.id
+                price_per_gram=material.cost_per_gram if material else 25.0,
+                print_request_id=print_request.id,
+                material_id=material.id if material else None,
+                color_id=color.id if color else None
             )
             print_request.filaments.append(filament)
             
@@ -292,31 +297,34 @@ class SlicerService:
             logger.error(f"Cleanup error: {str(e)}")
             return False
         
-    def get_available_materials(self) -> Dict:
+    def get_available_materials(self, printer_id=None) -> Dict:
         """
         Get available materials and their properties
+        
+        Args:
+            printer_id: Optional printer ID to filter by
         
         Returns:
             Dictionary of material names and their properties
         """
-        return {
-            name: {
-                'temperature': config.temperature,
-                'bed_temperature': config.bed_temperature,
-                'cost_per_gram': config.cost_per_gram
-            }
-            for name, config in AVAILABLE_MATERIALS.items()
-        }
+        from backend.slicer.config.material_config import get_available_materials
+        return get_available_materials(printer_id)
 
-    def get_available_colors(self) -> Dict:
+    def get_available_colors(self, material_id=None, printer_id=None) -> Dict:
         """
         Get available colors and their hex codes
+        
+        Args:
+            material_id: Optional material ID to filter by
+            printer_id: Optional printer ID to filter by
         
         Returns:
             Dictionary of color names and hex codes
         """
-        return AVAILABLE_COLORS   
-    
+        from backend.slicer.config.material_config import get_available_colors
+        return get_available_colors(material_id, printer_id)
+        
+        
     def update_print_request_status(self, request_id: str, status: str) -> Optional[PrintRequest]:
         """
         Update print request status and check if project is complete

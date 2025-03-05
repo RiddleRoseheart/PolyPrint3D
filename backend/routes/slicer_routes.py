@@ -6,6 +6,7 @@ from backend.utils import ResponseBuilder
 import logging
 from typing import Dict, Tuple
 import os
+from backend.slicer.config.material_config import MaterialConfig
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('slicer', __name__)
@@ -157,17 +158,22 @@ def cleanup_print_request(request_id: str):
         logger.error(f"Cleanup error: {str(e)}")
         return ResponseBuilder.error('Cleanup failed', 500)
     
+
 @bp.route('/api/slicer/materials', methods=['GET'])
 @login_required
 def get_materials():
     """
     Get available materials and their properties
     
+    Query parameters:
+        printer_id: Optional printer ID to filter by
+    
     Returns:
         JSON with materials data
     """
     try:
-        materials = slicer_service.get_available_materials()
+        printer_id = request.args.get('printer_id')
+        materials = slicer_service.get_available_materials(printer_id)
         return ResponseBuilder.success(materials)
     except Exception as e:
         logger.error(f"Error getting materials: {str(e)}")
@@ -179,11 +185,17 @@ def get_colors():
     """
     Get available colors
     
+    Query parameters:
+        material_id: Optional material ID to filter by
+        printer_id: Optional printer ID to filter by
+    
     Returns:
         JSON with colors data
     """
     try:
-        colors = slicer_service.get_available_colors()
+        material_id = request.args.get('material_id')
+        printer_id = request.args.get('printer_id')
+        colors = slicer_service.get_available_colors(material_id, printer_id)
         return ResponseBuilder.success(colors)
     except Exception as e:
         logger.error(f"Error getting colors: {str(e)}")
@@ -202,19 +214,16 @@ def download_gcode(request_id: str):
         G-code file for download
     """
     try:
-        # Get the print request
         print_request = slicer_service.get_print_request(request_id, current_user)
         
         if not print_request:
             return ResponseBuilder.error('Print request not found or access denied', 404)
         
-        # Get the gcode file path
         gcode_path = slicer_service.get_gcode_file_path(request_id)
         
         if not gcode_path or not os.path.exists(gcode_path):
             return ResponseBuilder.error('G-code file not found', 404)
         
-        # Get a sensible filename
         group_name = os.path.splitext(os.path.basename(print_request.file_path))[0]
         download_name = f"print_{group_name}.gcode"
         
