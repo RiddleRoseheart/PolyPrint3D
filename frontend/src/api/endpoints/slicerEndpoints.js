@@ -74,28 +74,39 @@ export const deletePrintRequest = async (requestId) => {
 };
 
 /**
- * Get available materials
- * @returns {Promise<Object>} Materials and their properties
+ * Get available colors 
+ * @param {string} materialId - Optional material ID to filter by
+ * @returns {Promise<Object>} Colors and their hex codes
  */
-export const getMaterials = async () => {
+export const getColors = async (materialId = null) => {
     try {
-        const response = await axiosInstance.get('/api/slicer/materials');
+        let url = '/api/slicer/colors';
+        if (materialId) {
+            url += `?material_id=${materialId}`;
+        }
+        const response = await axiosInstance.get(url);
         return processResponse(response.data);
     } catch (error) {
         handleError(error);
-    }
+        return {}; }
 };
 
 /**
- * Get available colors
- * @returns {Promise<Object>} Colors and their hex codes
+ * Get available materials
+ * @param {string} printerId - Optional printer ID to filter by
+ * @returns {Promise<Object>} Materials and their properties
  */
-export const getColors = async () => {
+export const getMaterials = async (printerId = null) => {
     try {
-        const response = await axiosInstance.get('/api/slicer/colors');
+        let url = '/api/slicer/materials';
+        if (printerId) {
+            url += `?printer_id=${printerId}`;
+        }
+        const response = await axiosInstance.get(url);
         return processResponse(response.data);
     } catch (error) {
         handleError(error);
+        return {}; 
     }
 };
 

@@ -98,16 +98,32 @@ def create_test_data():
         pla = Material(
             id=str(uuid.uuid4()),
             name="PLA",
-            density=1.24
+            density=1.24,
+            temperature=210.0,
+            bed_temperature=60.0,
+            cost_per_gram=0.25
         )
         
         abs_material = Material(
             id=str(uuid.uuid4()),
             name="ABS",
-            density=1.04
+            density=1.04,
+            temperature=240.0,
+            bed_temperature=110.0,
+            cost_per_gram=0.30
         )
         
-        db.session.add_all([pla, abs_material])
+        petg = Material(
+            id=str(uuid.uuid4()),
+            name="PETG",
+            density=1.27,
+            temperature=230.0,
+            bed_temperature=70.0,
+            cost_per_gram=0.28
+        )
+        
+        
+        db.session.add_all([pla, abs_material, petg])
         db.session.commit()
         
         # Create Colors
@@ -123,7 +139,25 @@ def create_test_data():
             hex_code="#0000FF"
         )
         
-        db.session.add_all([red, blue])
+        black = Color(
+            id=str(uuid.uuid4()),
+            name="Black",
+            hex_code="#000000"
+        )
+        
+        white = Color(
+            id=str(uuid.uuid4()),
+            name="White",
+            hex_code="#FFFFFF"
+        )
+        
+        green = Color(
+            id=str(uuid.uuid4()),
+            name="Green",
+            hex_code="#00FF00"
+        )
+        
+        db.session.add_all([red, blue, black, white, green])
         db.session.commit()
         
         # For user1
@@ -139,24 +173,11 @@ def create_test_data():
         db.session.add(file1)
         db.session.commit()
         
-        # Create filament
-        filament1 = Filament(
-            id=str(uuid.uuid4()),
-            name="Red PLA",
-            price_per_gram=0.03,
-            color=red,
-            material=pla
-        )
-        
-        db.session.add(filament1)
-        db.session.commit()
-        
         # Create a print request for user1
         print_request1 = PrintRequest(
             id=str(uuid.uuid4()),
             file_path="/dummy/path/sliced_file1.stl",
             original_file_id=file1.id,
-            filament_id=filament1.id,
             dimension="100x100x100",
             filling=20,
             layer_height=0.2,
@@ -170,6 +191,80 @@ def create_test_data():
         
         db.session.add(print_request1)
         db.session.commit()
+        
+        # Printer 1 has PLA in Red, White, Black and PETG in Blue
+        filaments = [
+            # Printer 1 filaments
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Red PLA",
+                price_per_gram=0.25,
+                color_id=red.id,
+                material_id=pla.id,
+                printer_id=test_printer1.id,
+                print_request_id=print_request1.id
+            ),
+            Filament(
+                id=str(uuid.uuid4()),
+                name="White PLA",
+                price_per_gram=0.25,
+                color_id=white.id,
+                material_id=pla.id,
+                printer_id=test_printer1.id,
+                print_request_id=print_request1.id
+            ),
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Black PLA",
+                price_per_gram=0.25,
+                color_id=black.id,
+                material_id=pla.id,
+                printer_id=test_printer1.id,
+                print_request_id=print_request1.id
+            ),
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Blue PETG",
+                price_per_gram=0.28,
+                color_id=blue.id,
+                material_id=petg.id,
+                printer_id=test_printer1.id,
+                print_request_id=print_request1.id
+            ),
+            
+            # Printer 2 filaments - has ABS in Blue, Green and PETG in Red
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Blue ABS",
+                price_per_gram=0.30,
+                color_id=blue.id,
+                material_id=abs_material.id,
+                printer_id=test_printer2.id,
+                print_request_id=print_request1.id
+            ),
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Green ABS",
+                price_per_gram=0.30,
+                color_id=green.id,
+                material_id=abs_material.id,
+                printer_id=test_printer2.id,
+                print_request_id=print_request1.id
+            ),
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Red PETG",
+                price_per_gram=0.28,
+                color_id=red.id,
+                material_id=petg.id,
+                printer_id=test_printer2.id,
+                print_request_id=print_request1.id
+            )
+        ]
+            
+        db.session.add_all(filaments)
+        db.session.commit()
+        
         
         # Create GCode file
         gcode_file1 = GCodeFile(
@@ -203,3 +298,5 @@ def create_test_data():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to create test data: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())

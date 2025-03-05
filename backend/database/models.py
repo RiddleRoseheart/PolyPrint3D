@@ -99,6 +99,9 @@ class Material(db.Model):
     name = db.Column(db.String(255), nullable=False)
     density = db.Column(db.Float, nullable=False)
     #filament_id = db.Column(db.String(36), db.ForeignKey('filament.id'), nullable=False)
+    temperature = db.Column(db.Float, nullable=False, default=220.0)
+    bed_temperature = db.Column(db.Float, nullable=False, default=60.0)
+    cost_per_gram = db.Column(db.Float, nullable=False, default=0.25)
     
     # Relationships
     filaments = db.relationship('Filament', back_populates='material')
