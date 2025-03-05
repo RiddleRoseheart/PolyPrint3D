@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -12,7 +12,8 @@ import {
     Typography, 
     Paper, 
     Alert,
-    CircularProgress
+    CircularProgress,
+    Button
 } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { getFileContent, analyzeSTLFile } from '../api/endpoints/fileEndpoints';
@@ -28,29 +29,163 @@ const PRINT_SETTINGS = {
     INFILL_LEVELS: [20, 50, 80]
 };
 
+// Helper function to check if WebGL is available
+const isWebGLAvailable = () => {
+    try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        return !!gl;
+    } catch (e) {
+        console.error("Error checking WebGL availability:", e);
+        return false;
+    }
+};
+
 const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
+    // State for print settings
     const [printSettings, setPrintSettings] = useState({
         quality: 'MEDIUM',
         infill: 20,
     });
+
+    // Loading and error states
     const [isLoading, setIsLoading] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [error, setError] = useState('');
+    const [debugInfo, setDebugInfo] = useState({ stage: 'initial', message: 'Initializing' });
+    const [previewStatus, setPreviewStatus] = useState({
+        webGLAvailable: true,
+        fileLoaded: false,
+        parsingComplete: false,
+        sceneReady: false
+    });
+
+    // Data states
     const [stlFile, setStlFile] = useState(null);
     const [materials, setMaterials] = useState({});
     const [colors, setColors] = useState({});
     const [objectSettings, setObjectSettings] = useState([]);
+
+    // THREE.js refs
     const mountRef = useRef(null);
+    const sceneRef = useRef(null);
+    const cameraRef = useRef(null);
+    const rendererRef = useRef(null);
+    const controlsRef = useRef(null);
+    const meshRef = useRef(null);
+    const animationFrameIdRef = useRef(null);
+    const mountedRef = useRef(true);
+    const sceneMounted = useRef(false);
+    const autoReloadAttemptedRef = useRef(false);
+
+    // Check if component is still mounted
+    useEffect(() => {
+        mountedRef.current = true;
+        // Check WebGL support on mount
+        const webGLSupported = isWebGLAvailable();
+        setPreviewStatus(prev => ({ ...prev, webGLAvailable: webGLSupported }));
+        if (!webGLSupported) {
+            setError('WebGL is not supported in your browser. 3D preview will not work.');
+        }
+        return () => {
+            mountedRef.current = false;
+            cleanupThreeJS();
+        };
+    }, []);
+
+    // Safe method to clear container contents
+    const clearContainer = useCallback(() => {
+        if (mountRef.current) {
+            try {
+                // Safer way to clear children
+                while (mountRef.current.firstChild) {
+                    mountRef.current.firstChild.remove();
+                }
+            } catch (e) {
+                console.warn('Error clearing container:', e);
+                // Fallback to innerHTML if remove() fails
+                mountRef.current.innerHTML = '';
+            }
+        }
+    }, []);
+
+    // Clean up THREE.js resources
+    const cleanupThreeJS = useCallback(() => {
+        console.log('Cleaning up THREE.js resources');
+        
+        // Cancel animation frame
+        if (animationFrameIdRef.current) {
+            cancelAnimationFrame(animationFrameIdRef.current);
+            animationFrameIdRef.current = null;
+        }
+        
+        // Dispose controls
+        if (controlsRef.current) {
+            controlsRef.current.dispose();
+            controlsRef.current = null;
+        }
+        
+        // Dispose mesh
+        if (meshRef.current) {
+            if (meshRef.current.geometry) {
+                meshRef.current.geometry.dispose();
+            }
+            
+            if (meshRef.current.material) {
+                if (Array.isArray(meshRef.current.material)) {
+                    meshRef.current.material.forEach(material => material.dispose());
+                } else {
+                    meshRef.current.material.dispose();
+                }
+            }
+            
+            if (sceneRef.current) {
+                sceneRef.current.remove(meshRef.current);
+            }
+            
+            meshRef.current = null;
+        }
+        
+        // Dispose renderer
+        if (rendererRef.current) {
+            try {
+                rendererRef.current.dispose();
+            } catch (e) {
+                console.error('Error disposing renderer:', e);
+            }
+            rendererRef.current = null;
+        }
+        
+        // Clear container - but only if we need to
+        if (sceneMounted.current) {
+            clearContainer();
+            sceneMounted.current = false;
+        }
+        
+        // Reset refs
+        sceneRef.current = null;
+        cameraRef.current = null;
+        
+        setPreviewStatus(prev => ({
+            ...prev,
+            sceneReady: false
+        }));
+    }, [clearContainer]);
 
     // Load STL file content, materials, colors and analyze objects
     useEffect(() => {
-        if (!fileData?.id) return;
+        if (!fileData?.id) {
+            console.log("No fileData.id available");
+            return;
+        }
 
         const loadDataAndAnalyze = async () => {
+            setIsAnalyzing(true);
+            setDebugInfo({ stage: 'loading', message: 'Loading file and materials' });
+            
             try {
-                setIsAnalyzing(true);
-                
                 // Get available materials and colors
+                console.log("Fetching materials and colors...");
                 const [materialsData, colorsData] = await Promise.all([
                     getMaterials(),
                     getColors()
@@ -60,142 +195,352 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                 setColors(colorsData || {});
                 
                 // Load file for 3D preview
-                const blob = await getFileContent(fileData.id);
-                const file = new File([blob], fileData.filename, { type: 'application/octet-stream' });
-                setStlFile(file);
+                setDebugInfo({ stage: 'file_loading', message: 'Loading STL file content' });
+                console.log("Loading STL file content...");
+                
+                try {
+                    const blob = await getFileContent(fileData.id);
+                    console.log("File loaded, size:", blob.size, "bytes");
+                    
+                    if (!blob || blob.size === 0) {
+                        throw new Error('Received empty file');
+                    }
+                    
+                    const file = new File([blob], fileData.filename || 'model.stl', { type: 'application/octet-stream' });
+                    setStlFile(file);
+                    setPreviewStatus(prev => ({ ...prev, fileLoaded: true }));
+                    
+                    setDebugInfo({ stage: 'file_loaded', message: `File loaded: ${file.name} (${file.size} bytes)` });
+                } catch (fileError) {
+                    console.error("Error loading file content:", fileError);
+                    setError(`Failed to load file: ${fileError.message}`);
+                }
                 
                 // Analyze STL file to get object count
-                const analysisResult = await analyzeSTLFile(fileData.id);
-
-                // Add debugging
-                console.log('Analysis result structure:', analysisResult);
-
-                // Check for the new response structure with .data property
-                if (analysisResult && analysisResult.status === 'success' && analysisResult.data && analysisResult.data.objects) {
-                    const objects = analysisResult.data.objects;
-                    console.log(`Detected ${objects.length} objects in the STL file`);
-                    setObjectSettings(objects);
-                } else if (analysisResult && analysisResult.objects) {
-                    // Fallback for old response format
-                    console.log(`Detected ${analysisResult.objects.length} objects in the STL file (old format)`);
-                    setObjectSettings(analysisResult.objects);
-                } else {
-                    // Fallback if analysis fails
+                setDebugInfo({ stage: 'analyzing', message: 'Analyzing STL file for objects' });
+                console.log("Analyzing STL file...");
+                
+                try {
+                    const analysisResult = await analyzeSTLFile(fileData.id);
+                    console.log('Analysis result:', analysisResult);
+                    
+                    if (analysisResult?.status === 'success' && analysisResult.data?.objects) {
+                        setObjectSettings(analysisResult.data.objects);
+                        setDebugInfo({ stage: 'analysis_complete', message: `Detected ${analysisResult.data.objects.length} objects` });
+                    } else if (analysisResult?.objects) {
+                        setObjectSettings(analysisResult.objects);
+                        setDebugInfo({ stage: 'analysis_complete', message: `Detected ${analysisResult.objects.length} objects (legacy format)` });
+                    } else {
+                        console.warn("Could not detect objects, using default");
+                        setObjectSettings([{ id: 1, material: 'PLA', color: 'Black' }]);
+                        setDebugInfo({ stage: 'analysis_fallback', message: 'Using default object settings' });
+                    }
+                } catch (analysisError) {
+                    console.error("Error analyzing STL:", analysisError);
+                    setError(`Failed to analyze model: ${analysisError.message}`);
                     setObjectSettings([{ id: 1, material: 'PLA', color: 'Black' }]);
-                    setError('Could not analyze objects in the STL file');
+                    setDebugInfo({ stage: 'analysis_error', message: `Analysis error: ${analysisError.message}` });
                 }
                 
             } catch (error) {
-                console.error('Error loading or analyzing data:', error);
-                setError('Failed to analyze the 3D model');
-                setObjectSettings([{ id: 1, material: 'PLA', color: 'Black' }]);
+                console.error('Error in data loading pipeline:', error);
+                setError(`Error: ${error.message}`);
+                setDebugInfo({ stage: 'error', message: `Error: ${error.message}` });
             } finally {
                 setIsAnalyzing(false);
             }
         };
 
         loadDataAndAnalyze();
+        
+        // Reset auto-reload attempt flag when fileData changes
+        autoReloadAttemptedRef.current = false;
     }, [fileData]);
 
-    // Three.js preview setup
+    // Initialize THREE.js scene when STL file is ready
     useEffect(() => {
-        if (!stlFile || !mountRef.current) return;
+        if (!stlFile || !mountRef.current || !previewStatus.webGLAvailable) {
+            return;
+        }
 
-        const initScene = () => {
-            // Clear existing scene
-            if (mountRef.current.children.length > 0) {
-                mountRef.current.innerHTML = '';
-            }
+        // First clean up any existing scene
+        cleanupThreeJS();
 
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf5f5f5);
-            
-            const width = mountRef.current.clientWidth;
-            const height = mountRef.current.clientHeight;
-            
-            // Setup camera and renderer
-            const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(width, height);
-            mountRef.current.appendChild(renderer.domElement);
+        // Short delay to ensure cleanup completes
+        const timeoutId = setTimeout(() => {
+            if (!mountedRef.current) return;
 
-            // Setup controls
-            const controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
+            console.log("Initializing THREE.js scene");
+            setDebugInfo({ stage: 'preview_init', message: 'Initializing 3D preview' });
 
-            // Setup lighting
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(1, 1, 1);
-            scene.add(ambientLight, directionalLight);
-
-            return { scene, camera, renderer, controls };
-        };
-
-        const { scene, camera, renderer, controls } = initScene();
-
-        // Load and display STL file
-        const reader = new FileReader();
-        reader.onload = (e) => {
             try {
-                const loader = new STLLoader();
-                const geometry = loader.parse(e.target.result);
-                const material = new THREE.MeshPhongMaterial({
-                    color: 0x00ff00,
-                    specular: 0x111111,
-                    shininess: 200
+                // Initialize scene
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xf5f5f5);
+                sceneRef.current = scene;
+                
+                // Get container dimensions
+                const width = mountRef.current.clientWidth;
+                const height = mountRef.current.clientHeight;
+                console.log("Container dimensions:", width, "x", height);
+                
+                // Create camera
+                const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+                camera.position.set(0, 5, 10);
+                cameraRef.current = camera;
+
+                // Clear container before creating renderer
+                clearContainer();
+                
+                console.log("Creating WebGL renderer");
+                const renderer = new THREE.WebGLRenderer({ 
+                    antialias: true,
+                    alpha: true
                 });
-                const mesh = new THREE.Mesh(geometry, material);
+                
+                renderer.setSize(width, height);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                mountRef.current.appendChild(renderer.domElement);
+                rendererRef.current = renderer;
+                sceneMounted.current = true;
+                
+                setDebugInfo({ stage: 'renderer_created', message: 'WebGL renderer created' });
+                
+                // Setup controls
+                console.log("Setting up orbit controls");
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.25;
+                controlsRef.current = controls;
+                
+                // Add lights
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+                directionalLight.position.set(1, 1, 1);
+                scene.add(ambientLight, directionalLight);
+                
+                // Handle window resize
+                const handleResize = () => {
+                    if (!mountRef.current || !rendererRef.current) return;
+                    
+                    const width = mountRef.current.clientWidth;
+                    const height = mountRef.current.clientHeight;
+                    
+                    camera.aspect = width / height;
+                    camera.updateProjectionMatrix();
+                    
+                    renderer.setSize(width, height);
+                };
+                
+                window.addEventListener('resize', handleResize);
+                
+                // Animation loop
+                const animate = () => {
+                    if (!mountedRef.current) return;
+                    
+                    animationFrameIdRef.current = requestAnimationFrame(animate);
+                    
+                    if (controlsRef.current) {
+                        controlsRef.current.update();
+                    }
+                    
+                    if (rendererRef.current && sceneRef.current && cameraRef.current) {
+                        rendererRef.current.render(sceneRef.current, cameraRef.current);
+                    }
+                };
+                
+                animate();
+                
+                setPreviewStatus(prev => ({ ...prev, sceneReady: true }));
+                setDebugInfo({ stage: 'scene_ready', message: 'THREE.js scene ready' });
+                
+                // Load the STL model
+                console.log("Loading STL into scene");
+                loadSTLModel();
 
-                // Center and scale mesh
-                geometry.computeBoundingBox();
-                const center = geometry.boundingBox.getCenter(new THREE.Vector3());
-                mesh.position.sub(center);
-                
-                const box = new THREE.Box3().setFromObject(mesh);
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z);
-                camera.position.z = maxDim * 2;
-                
-                scene.add(mesh);
             } catch (error) {
-                console.error('Error parsing STL:', error);
-                setError('Failed to parse 3D model');
+                console.error('Error setting up THREE.js scene:', error);
+                setError(`Failed to initialize 3D preview: ${error.message}`);
+                setDebugInfo({ stage: 'init_error', message: `Scene init error: ${error.message}` });
             }
-        };
-
-        reader.readAsArrayBuffer(stlFile);
-
-        // Animation loop
-        const animate = () => {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        };
-        animate();
-
-        // Handle window resizing
-        const handleResize = () => {
-            const width = mountRef.current.clientWidth;
-            const height = mountRef.current.clientHeight;
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            renderer.setSize(width, height);
-        };
-
-        window.addEventListener('resize', handleResize);
-
-        // Cleanup
+        }, 100);
+        
         return () => {
-            window.removeEventListener('resize', handleResize);
-            controls.dispose();
-            renderer.dispose();
-            if (mountRef.current) {
-                mountRef.current.innerHTML = '';
-            }
+            clearTimeout(timeoutId);
         };
+    }, [stlFile, clearContainer, cleanupThreeJS, previewStatus.webGLAvailable]);
+
+    // Load STL model into the scene
+    const loadSTLModel = useCallback(() => {
+        if (!stlFile || !sceneRef.current || !cameraRef.current) {
+            console.log("Cannot load STL model - prerequisites not met");
+            return;
+        }
+        
+        try {
+            setDebugInfo({ stage: 'loading_stl', message: 'Loading STL into scene' });
+            
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                if (!mountedRef.current) return;
+                
+                try {
+                    console.log("Parsing STL data");
+                    const loader = new STLLoader();
+                    const geometry = loader.parse(e.target.result);
+                    
+                    setPreviewStatus(prev => ({ ...prev, parsingComplete: true }));
+                    setDebugInfo({ stage: 'stl_parsed', message: 'STL file parsed successfully' });
+                    
+                    // Create material and mesh
+                    const material = new THREE.MeshPhongMaterial({
+                        color: 0x00ff00,
+                        specular: 0x111111,
+                        shininess: 200
+                    });
+                    
+                    const mesh = new THREE.Mesh(geometry, material);
+                    meshRef.current = mesh;
+                    
+                    // Center model
+                    geometry.computeBoundingBox();
+                    const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+                    mesh.position.sub(center);
+                    
+                    // Scale view to model
+                    const box = new THREE.Box3().setFromObject(mesh);
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    
+                    console.log("Model dimensions:", size);
+                    cameraRef.current.position.z = maxDim * 2.5;
+                    
+                    if (controlsRef.current) {
+                        controlsRef.current.target.set(0, 0, 0);
+                        controlsRef.current.update();
+                    }
+                    
+                    // Add to scene
+                    sceneRef.current.add(mesh);
+                    setDebugInfo({ stage: 'model_loaded', message: 'Model added to scene' });
+                    
+                } catch (parseError) {
+                    console.error('Error parsing STL:', parseError);
+                    setError(`Failed to parse STL: ${parseError.message}`);
+                    setDebugInfo({ stage: 'parse_error', message: `Parse error: ${parseError.message}` });
+                }
+            };
+            
+            reader.onerror = (fileError) => {
+                console.error('Error reading file:', fileError);
+                setError(`Failed to read file: ${fileError}`);
+                setDebugInfo({ stage: 'read_error', message: `File read error: ${fileError}` });
+            };
+            
+            console.log("Reading STL file");
+            reader.readAsArrayBuffer(stlFile);
+            
+        } catch (error) {
+            console.error('Error in STL loading process:', error);
+            setError(`Failed to load 3D model: ${error.message}`);
+            setDebugInfo({ stage: 'load_error', message: `Load error: ${error.message}` });
+        }
     }, [stlFile]);
 
+    // Force reload preview
+    const handleForceReload = useCallback(() => {
+        // First clean up any existing scene
+        cleanupThreeJS();
+        
+        // Short delay to ensure cleanup completes
+        setTimeout(() => {
+            if (stlFile && mountRef.current) {
+                // Create a new scene
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xf5f5f5);
+                sceneRef.current = scene;
+                
+                // Get container dimensions
+                const width = mountRef.current.clientWidth;
+                const height = mountRef.current.clientHeight;
+                
+                // Create camera
+                const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+                camera.position.set(0, 5, 10);
+                cameraRef.current = camera;
+                
+                // Clear any existing content
+                clearContainer();
+                
+                // Create renderer
+                const renderer = new THREE.WebGLRenderer({ 
+                    antialias: true,
+                    alpha: true
+                });
+                
+                renderer.setSize(width, height);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                mountRef.current.appendChild(renderer.domElement);
+                rendererRef.current = renderer;
+                sceneMounted.current = true;
+                
+                // Create controls
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controlsRef.current = controls;
+                
+                // Add lights
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+                directionalLight.position.set(1, 1, 1);
+                scene.add(ambientLight, directionalLight);
+                
+                // Animation loop
+                const animate = () => {
+                    if (!mountedRef.current) return;
+                    
+                    animationFrameIdRef.current = requestAnimationFrame(animate);
+                    
+                    if (controlsRef.current) {
+                        controlsRef.current.update();
+                    }
+                    
+                    if (rendererRef.current && sceneRef.current && cameraRef.current) {
+                        rendererRef.current.render(sceneRef.current, cameraRef.current);
+                    }
+                };
+                
+                animate();
+                
+                setPreviewStatus(prev => ({ ...prev, sceneReady: true }));
+                
+                // Load the STL model
+                loadSTLModel();
+            }
+        }, 200);
+    }, [stlFile, cleanupThreeJS, clearContainer, loadSTLModel]);
+
+    // Auto-reload effect
+    useEffect(() => {
+        if (stlFile && 
+            previewStatus.fileLoaded && 
+            !previewStatus.sceneReady && 
+            !autoReloadAttemptedRef.current && 
+            !isAnalyzing) {
+            
+            console.log("Auto-triggering scene reload");
+            autoReloadAttemptedRef.current = true;
+            
+            const autoReloadTimer = setTimeout(() => {
+                handleForceReload();
+            }, 1000);
+            
+            return () => clearTimeout(autoReloadTimer);
+        }
+    }, [stlFile, previewStatus.fileLoaded, previewStatus.sceneReady, isAnalyzing, handleForceReload]);
+
+    // Handle print settings change
     const handleSettingChange = (setting, value) => {
         setPrintSettings(prev => ({
             ...prev,
@@ -203,12 +548,13 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
         }));
     };
 
+    // Handle slicing submit
     const handleSlicingSubmit = async () => {
         setIsLoading(true);
         setError('');
         
         try {
-            console.log('Sending slicing request with configurations:', {
+            console.log('Sending slicing request:', {
                 fileId: fileData.id,
                 globalSettings: {
                     infill: printSettings.infill,
@@ -224,11 +570,13 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                 },
                 objects: objectSettings
             });
-            console.log('Slicing completed successfully:', response);
+            
+            console.log('Slicing completed:', response);
             onSlicingComplete(response);
+            
         } catch (error) {
-            setError(error.message || 'Failed to start slicing process');
             console.error('Slicing error:', error);
+            setError(error.message || 'Failed to start slicing process');
         } finally {
             setIsLoading(false);
         }
@@ -248,6 +596,22 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                     </Alert>
                 )}
                 
+                {/* Debug info panel */}
+                <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2" gutterBottom>
+                        <strong>Debug:</strong> {debugInfo.stage} - {debugInfo.message}
+                    </Typography>
+                    <Typography variant="body2">
+                        WebGL: {previewStatus.webGLAvailable ? '✅' : '❌'} | 
+                        File: {previewStatus.fileLoaded ? '✅' : '❌'} | 
+                        Parsed: {previewStatus.parsingComplete ? '✅' : '❌'} | 
+                        Scene: {previewStatus.sceneReady ? '✅' : '❌'}
+                    </Typography>
+                    <Button size="small" onClick={handleForceReload}>
+                        Force Reload Preview
+                    </Button>
+                </Alert>
+                
                 {isAnalyzing ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
                         <CircularProgress />
@@ -266,9 +630,28 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                             borderRadius: 1,
                             overflow: 'hidden',
                             backgroundColor: '#f5f5f5',
-                            visibility: stlFile ? 'visible' : 'hidden'
+                            position: 'relative'
                         }} 
-                    />
+                    >
+                        {(!stlFile || !previewStatus.fileLoaded) && (
+                            <Box sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                zIndex: 1
+                            }}>
+                                <Typography variant="body1" color="text.secondary">
+                                    {fileData ? 'Loading 3D model...' : 'No 3D model loaded'}
+                                </Typography>
+                            </Box>
+                        )}
+                    </Box>
                 )}
             </Paper>
 
@@ -312,22 +695,22 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
             </Paper>
             
             {/* Object settings section */}
-            {isAnalyzing ? (
-                <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
-                    <CircularProgress size={24} sx={{ mr: 2 }} />
-                    <Typography variant="body1" component="span">
-                        Detecting objects in 3D model...
-                    </Typography>
-                </Paper>
-            ) : objectSettings.length > 0 && (
-                <MultiObjectSettings 
-                    objects={objectSettings}
-                    onObjectsChange={setObjectSettings}
-                    materials={materials}
-                    colors={colors}
-                    setColors={setColors}
-                />
-            )}
+                    {isAnalyzing ? (
+            <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
+                <CircularProgress size={24} sx={{ mr: 2 }} />
+                <Typography variant="body1" component="span">
+                    Detecting objects in 3D model...
+                </Typography>
+            </Paper>
+        ) : objectSettings.length > 0 && (
+            <MultiObjectSettings 
+                objects={objectSettings}
+                onObjectsChange={setObjectSettings}
+                materials={materials}
+                colors={colors}
+                setColors={setColors} // This line is crucial
+            />
+        )}
             
             {/* Submit button */}
             <LoadingButton

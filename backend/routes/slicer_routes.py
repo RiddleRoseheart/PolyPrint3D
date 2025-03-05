@@ -27,7 +27,7 @@ def configure_blueprint(state):
         username=state.app.config.get('SFTP_USERNAME', ''),
         password=state.app.config.get('SFTP_PASSWORD', ''),
         remote_path=state.app.config.get('SFTP_REMOTE_PATH', ''),
-        local_output_path=state.app.config.get('LOCAL_OUTPUT_PATH', 'backend/slicer/output')
+        local_output_path=state.app.config.get('LOCAL_OUTPUT_PATH', '/slicer/output')
     )
     
     # Create slicer service with file manager
