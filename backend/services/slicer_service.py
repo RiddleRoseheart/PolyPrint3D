@@ -5,7 +5,8 @@ import uuid
 import logging
 from backend.slicer.scripts.file_manager import FileManager
 from backend.database.config import db
-from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User
+from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User, Printer
+from backend.services.printer import PrinterService
 from backend.slicer.scripts.slicer import split_and_distribute_objects, slice_with_prusa_slicer
 from backend.slicer.config.material_config import AVAILABLE_MATERIALS, AVAILABLE_COLORS
 from backend.services.notification_service import NotificationService
@@ -259,3 +260,30 @@ class SlicerService:
                 
         except Exception as e:
             logger.error(f"Error checking project completion: {str(e)}")
+
+    def process_and_send_to_printer(self, sliced_file_path, printer_id):
+        """
+        Process sliced file and send to specified printer
+        """
+        try:
+            # Get the printer from database
+            printer = Printer.query.get(printer_id)
+            
+            if not printer:
+                raise ValueError(f"Printer with ID {printer_id} not found")
+            
+            # Upload file to printer
+            printer_service = PrinterService()
+            upload_result = printer_service.files.upload_gcode(
+                printer_id=printer.id, 
+                file_path=sliced_file_path, 
+                auto_select=True,  # Automatically select the file
+                auto_print=True    # Optionally start printing immediately
+            )
+            
+            logger.info(f"File {sliced_file_path} uploaded to printer {printer.name}")
+            return upload_result
+        
+        except Exception as e:
+            logger.error(f"Failed to send file to printer: {str(e)}")
+            raise
