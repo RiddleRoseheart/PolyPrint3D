@@ -22,6 +22,11 @@ class UserExistsError(AuthError):
     """User already exists"""
     pass
 
+class UserNotFoundError(AuthError):
+    """User not found"""
+    def __str__(self):
+        return "User not found"
+
 class AuthService:
     """Service layer for authentication and user management"""
     
@@ -186,20 +191,106 @@ class AuthService:
             raise
 
     @staticmethod
-    def delete_user(user: User) -> bool:
-        """Delete a user"""
+    def get_all_users() -> List[User]:
+        """Get all users (admin function)"""
+        return User.query.all()
+        
+    @staticmethod
+    def update_user_role(user_id: str, role: str) -> User:
+        """
+        Update a user's role (admin function)
+        
+        Args:
+            user_id: ID of the user to update
+            role: New role for the user
+            
+        Returns:
+            Updated User object
+            
+        Raises:
+            UserNotFoundError: If user is not found
+            ValueError: If role is invalid
+        """
         try:
-            db.session.delete(user)
+            user = User.query.get(user_id)
+            if not user:
+                raise UserNotFoundError()
+                
+            # Validate role
+            if role not in [r.value for r in UserRole]:
+                raise ValueError(f"Invalid role: {role}")
+                
+            user.role = role
             db.session.commit()
-            logger.info(f"Deleted user: {user.id}")
+            logger.info(f"Updated role for user {user.id} to {role}")
+            return user
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to update user role: {str(e)}")
+            raise
+    
+    @staticmethod
+    def create_admin_user(
+        email: str, 
+        password: str, 
+        name: str,
+        is_admin: bool = False
+    ) -> User:
+        """
+        Create a new user with optional admin role (admin function)
+        
+        Args:
+            email: User's email address
+            password: User's password
+            name: User's display name
+            is_admin: Whether the user should have admin role
+            
+        Returns:
+            Created User object
+            
+        Raises:
+            ValueError: If validation fails
+            UserExistsError: If email already exists
+        """
+        role = UserRole.ADMIN.value if is_admin else UserRole.USER.value
+        return AuthService.create_user(
+            email=email,
+            password=password,
+            name=name,
+            role=role
+        )
+    
+    @staticmethod
+    def delete_user(user: User) -> bool:
+        """Delete a user using direct SQL to bypass SQLAlchemy's cascading"""
+        try:
+            from sqlalchemy import text
+            from backend.database.config import db
+            
+            # Get the user_id for our SQL operations
+            user_id = user.id
+            
+            # Delete directly in database without trying to load associations
+            # First delete associated print requests
+            db.session.execute(
+                text("DELETE FROM print_request WHERE user_id = :user_id"), 
+                {"user_id": user_id}
+            )
+            
+            # Then delete the user directly with SQL
+            db.session.execute(
+                text("DELETE FROM user WHERE id = :user_id"),
+                {"user_id": user_id}
+            )
+            
+            # Commit the transaction
+            db.session.commit()
+            
+            logger.info(f"Deleted user: {user_id}")
             return True
+            
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to delete user: {str(e)}")
             raise
-
-    @staticmethod
-    def get_all_users() -> List[User]:
-        """Get all users (admin function)"""
-        return User.query.all()
-    

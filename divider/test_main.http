@@ -1,9 +1,25 @@
 @baseUrl = http://127.0.0.1:8000
-@ip = 10.0.0.254
-#@ip = 10.2.168.3
-@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
-#@apiKey = uyyIkhKZuP8bqfLWv8OS5zBMS8AjIbnjqWEmwH9NRzo
-@path = C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode
+# printer 1
+#@ip = 192.168.1.7
+#@apiKey = N9BjnWFdBOGCAhNlF9EmepEJ6PAklXDye0pEhRUBYxs
+
+# printer 2
+@ip = 192.168.1.8
+@apiKey = XXTbEpJhyc7DglBQcxzodvch3YbmeJl9Uv6R6PHhgfY
+
+# printer 3
+#@ip = 192.168.1.9
+#@apiKey = 0sEcfqbyAUqaBX-LySJAHY7xANs-_ge1_L7JnpdWz4Y
+
+# printer 4
+#@ip = 192.168.1.10
+#@apiKey = LwkjwuybUCIRZIbdaaQ3UGRykEAyOP6nGkp6MJphzX4
+
+#printer home
+#@ip = 10.0.0.254
+#@apiKey = hFswwTnAYX5NloewqL4MHfW_LyTqF7_GZ3qPB4WenFI
+@path = C:\\Users\\antoine\\Documents\\projects\\school\\finalwork\\git\\PolyPrint3D\\divider\\demo.gcode.
+
 # Test the root endpoint
 GET {{baseUrl}}/
 Accept: application/json
@@ -75,34 +91,21 @@ POST {{baseUrl}}/upload?ip={{ip}}&api_key={{apiKey}}&path={{path}}
 ###
 
 # Test the delete endpoint
-DELETE {{baseUrl}}/delete?ip={{ip}}&api_key={{apiKey}}&name=demo.gcode
+DELETE {{baseUrl}}/delete?ip={{ip}}&api_key={{apiKey}}&name=bottom_mesh_mount_0.15mm_PLA_MK3S_2h53m.gcode
 Accept: application/json
-
-
-
-
-
-
 
 ###
-POST {{baseUrl}}/api/printer/command
-Content-Type: application/json
-Accept: application/json
-
-{
-  "ip": "{{ip}}",
-  "api_key": "{{apiKey}}",
-  "command": "M114"
-}
+POST {{baseUrl}}/select_file?ip={{ip}}&api_key={{apiKey}}&name=bottom_mesh_mount_0.15mm_PLA_MK3S_2h53m.gcode
 
 ###
-# Test the job status endpoint
-# Test the job cancel endpoint
-POST {{baseUrl}}/job/cancel
-Content-Type: application/json
+POST {{baseUrl}}/job?ip={{ip}}&api_key={{apiKey}}
+
+###
+POST {{baseUrl}}/job/cancel?ip={{ip}}&api_key={{apiKey}}
 Accept: application/json
 
-{
-  "ip": "{{ip}}",
-  "api_key": "{{apiKey}}"
-}
+###
+POST {{baseUrl}}/job/pause?ip={{ip}}&api_key={{apiKey}}
+
+###
+POST {{baseUrl}}/job/resume?ip={{ip}}&api_key={{apiKey}}

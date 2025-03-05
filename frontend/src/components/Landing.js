@@ -23,7 +23,6 @@ const Landing = ({ user }) => {
     const styles = {
         landingPage: {
             fontFamily: 'Arial, sans-serif',
-            textAlign: 'center',
             padding: '20px',
         },
         heroSection: {
@@ -55,6 +54,7 @@ const Landing = ({ user }) => {
         sectionTitle: {
             fontSize: '2.5rem',
             marginBottom: '20px',
+            textAlign: 'center'
         },
         sectionText: {
             fontSize: '1.2rem',
@@ -122,7 +122,12 @@ const Landing = ({ user }) => {
             >
                 <h2 style={styles.sectionTitle}>Meet the Team</h2>
                 <p style={styles.sectionText}>
-                    Ik ben Rand, de projectleider en een machine learning en AI-enthousiasteling. Het idee voor dit project ontstond tijdens roboticalessen met mijn docent Maarten Dequanter. Antoine, mijn teamlid, was aanwezig tijdens deze projectideevoorstel en toonde meteen zijn interesse aan. Zijn ervaring in 3D-printing en machines gaan goed van pas komen tijdens ons project. Yasmine is een toegewijde developer en harde werker. Nour, onze creatieve geest, is een robotica-enthousiasteling en getalenteerde developer.
+                    Wij zijn een gedreven team met een passie voor technologie en innovatie! <br />
+                    <strong>Rand</strong>, onze projectleider, is een enthousiaste machine learning- en AI-liefhebber die graag nieuwe uitdagingen aangaat. <br />
+                    <strong>Antoine</strong> beheert de 3D-printers en brengt ervaring in 3D-printing en machinebeheer mee. <br />
+                    <strong>Yasmine</strong> is een toegewijde en flexibele developer met een sterke expertise in de backend. Haar probleemoplossend vermogen en doorzettingskracht maken haar een onmisbare schakel in ons team. <br />
+                    <strong>Nour</strong> is de creatieve geest van het team en een expert in frontend-ontwikkeling. Haar innovatieve ideeën en oog voor detail zorgen voor een gebruiksvriendelijke en efficiënte interface. <br />
+                    Met grote dank aan <strong>Maarten Dequanter</strong>, die ons heeft geïnspireerd en begeleid bij het vormgeven van dit project. Ook willen we <strong>Karel en Laurence van de ICT-dienst in EhB</strong> bedanken voor hun waardevolle steun en hulp gedurende het traject.                
                 </p>
             </section>
 
@@ -135,7 +140,9 @@ const Landing = ({ user }) => {
             >
                 <h2 style={styles.sectionTitle}>About PolyPrint 3D</h2>
                 <p style={styles.sectionText}>
-                    Het doel van PolyPrint 3D is om het 3D-printproces te versnellen, en als u ooit een 3D printer moest gebruiken dan weet u hoe traag deze proces kan zijn. Door printtaken te verdelen over meerdere printers. Een gebruiker uploadt zijn bestand met zijn onderdelen op onze website, waarna de software dit bestand opstuurt naar de slicer die het automatisch scant en snijdt en de delen tijdelijk opslaagt in de filestorage. Dan gaat de devider op onze site die de printers beheert bepalen welke printers er beschikbaar zijn, en gaat het de gesnede documenten sturen naar deze verschillende printers tegelijkertijd. Zo gaat de printtijd in totaal aanzienlijk verlagen en besparen we enorm veel tijd.
+                    PolyPrint 3D is een softwareoplossing die het 3D-printproces aanzienlijk versnelt door printtaken slim te verdelen over meerdere printers. In plaats van één printer een volledige set onderdelen te laten verwerken, analyseert onze software het geüploade bestand, splitst het automatisch in afzonderlijke componenten en stuurt elk onderdeel gelijktijdig naar beschikbare printers.<br />
+                    
+                    <br />Dit zorgt voor een drastische vermindering van de totale printtijd, wat vooral voordelig is voor gebruikers die regelmatig 3D-geprinte onderdelen nodig hebben, zoals in roboticalabs of productieomgevingen. Dankzij deze efficiënte taakverdeling wordt kostbare tijd bespaard en kan het printproces veel sneller verlopen.                
                 </p>
             </section>
 
