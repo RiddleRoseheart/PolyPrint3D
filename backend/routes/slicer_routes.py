@@ -7,6 +7,7 @@ import logging
 from typing import Dict, Tuple
 import os
 from backend.slicer.config.material_config import MaterialConfig
+from backend.database.models import Printer
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('slicer', __name__)
@@ -253,13 +254,30 @@ def send_to_printer(request_id: str):
         JSON response indicating success or failure
     """
     try:
+        # Get print request to check if it exists
+        print_request = slicer_service.get_print_request(request_id, current_user)
+        if not print_request:
+            return ResponseBuilder.error("Print request not found or access denied", 404)
+        
+        # Check if printer is assigned
+        if not print_request.printer_id:
+            return ResponseBuilder.error(f"No printer assigned to print request {request_id}", 400)
+        
+        # Check printer status before sending
+        printer = Printer.query.get(print_request.printer_id)
+        if not printer:
+            return ResponseBuilder.error(f"Printer {print_request.printer_id} not found", 404)
+        
+        logger.info(f"Sending print request {request_id} to printer {printer.name} at {printer.ip_address}")
+        
+        # Send to printer
         success = slicer_service.send_to_printer(request_id, current_user)
         
         if success:
             return ResponseBuilder.success(message="Print job sent to printer successfully")
         else:
-            return ResponseBuilder.error("Failed to send print job to printer", 400)
+            return ResponseBuilder.error("Failed to send print job to printer. Check server logs for details.", 400)
             
     except Exception as e:
         logger.error(f"Error sending print job to printer: {str(e)}")
-        return ResponseBuilder.error(f"Error sending print job to printer: {str(e)}", 500)
+        return ResponseBuilder.error("Server error while sending print job to printer", 500)

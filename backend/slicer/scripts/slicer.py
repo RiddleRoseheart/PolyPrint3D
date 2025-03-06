@@ -339,7 +339,8 @@ def split_and_distribute_objects(input_path, file_manager, job_name, build_volum
                 'material': material,
                 'color': color, 
                 'price':total_price,
-                'weight':total_weight
+                'weight':total_weight,
+                
                 
             })
         
