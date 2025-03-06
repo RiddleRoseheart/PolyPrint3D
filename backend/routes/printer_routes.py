@@ -8,7 +8,7 @@ import uuid
 import requests
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) 
 bp = Blueprint('printer', __name__)
 
 @bp.route('/api/admin/printers', methods=['GET'])
@@ -439,7 +439,7 @@ def add_color():
         db.session.rollback()
         logger.error(f"Error adding color: {str(e)}")
         return ResponseBuilder.error(str(e), 500)
-
+#TODO
 # Helper functions
 def test_printer_connection(ip_address, api_key):
     """Test connection to an OctoPrint server"""
@@ -471,7 +471,7 @@ def test_printer_connection(ip_address, api_key):
             'status': 'offline',
             'message': str(e)
         }
-
+#TODO
 def check_printer_connection(printer):
     """Check connection status of a printer"""
     try:
@@ -514,7 +514,7 @@ def check_printer_connection(printer):
             'status': 'offline',
             'message': str(e)
         }
-
+#TODO
 def get_printer_job_info(printer):
     """Get job information from a printer"""
     try:
@@ -532,3 +532,101 @@ def get_printer_job_info(printer):
             return None
     except:
         return None
+    
+    
+@bp.route('/api/admin/printers/<printer_id>/pause', methods=['POST'])
+@login_required
+def pause_printer_print(printer_id):
+    """Pause the current print job on a printer"""
+    if current_user.role != UserRole.ADMIN.value:
+        return ResponseBuilder.error("Admin access required", 403)
+        
+    try:
+        printer = Printer.query.get(printer_id)
+        if not printer:
+            return ResponseBuilder.error("Printer not found", 404)
+            
+        # Initialize OctoPrint service
+        from backend.services.octoprint_service import OctoPrintService
+        octoprint_service = OctoPrintService()
+        
+        # Pause print job
+        success = octoprint_service.pause_print_job(printer)
+        
+        if success:
+            return ResponseBuilder.success({"message": "Print job paused successfully"})
+        else:
+            return ResponseBuilder.error("Failed to pause print job", 400)
+            
+    except Exception as e:
+        logger.error(f"Error pausing print: {str(e)}")
+        return ResponseBuilder.error(str(e), 500)
+        
+@bp.route('/api/admin/printers/<printer_id>/resume', methods=['POST'])
+@login_required
+def resume_printer_print(printer_id):
+    """Resume the paused print job on a printer"""
+    if current_user.role != UserRole.ADMIN.value:
+        return ResponseBuilder.error("Admin access required", 403)
+        
+    try:
+        printer = Printer.query.get(printer_id)
+        if not printer:
+            return ResponseBuilder.error("Printer not found", 404)
+            
+        # Initialize OctoPrint service
+        from backend.services.octoprint_service import OctoPrintService
+        octoprint_service = OctoPrintService()
+        
+        # Resume print job
+        success = octoprint_service.resume_print_job(printer)
+        
+        if success:
+            return ResponseBuilder.success({"message": "Print job resumed successfully"})
+        else:
+            return ResponseBuilder.error("Failed to resume print job", 400)
+            
+    except Exception as e:
+        logger.error(f"Error resuming print: {str(e)}")
+        return ResponseBuilder.error(str(e), 500)
+        
+@bp.route('/api/admin/printers/<printer_id>/cancel', methods=['POST'])
+@login_required
+def cancel_printer_print(printer_id):
+    """Cancel the current print job on a printer"""
+    if current_user.role != UserRole.ADMIN.value:
+        return ResponseBuilder.error("Admin access required", 403)
+        
+    try:
+        printer = Printer.query.get(printer_id)
+        if not printer:
+            return ResponseBuilder.error("Printer not found", 404)
+            
+        # Initialize OctoPrint service
+        from backend.services.octoprint_service import OctoPrintService
+        octoprint_service = OctoPrintService()
+        
+        # Cancel print job
+        success = octoprint_service.cancel_print_job(printer)
+        
+        if success:
+            # Update any associated print requests to cancelled state
+            active_requests = PrintRequest.query.filter_by(
+                printer_id=printer.id, 
+                state="printing"
+            ).all()
+            
+            for request in active_requests:
+                request.state = "cancelled"
+                
+            db.session.commit()
+            
+            return ResponseBuilder.success({"message": "Print job cancelled successfully"})
+        else:
+            return ResponseBuilder.error("Failed to cancel print job", 400)
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error cancelling print: {str(e)}")
+        return ResponseBuilder.error(str(e), 500)
+    

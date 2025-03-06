@@ -1,7 +1,6 @@
 from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
-from backend.routes import file_routes, slicer_routes, auth_routes
-from backend.routes.printer import bp as printer_bp
+from backend.routes import file_routes, slicer_routes, auth_routes, printer_routes
 from pathlib import Path
 
 import os
@@ -125,7 +124,7 @@ def create_app():
     app.register_blueprint(file_routes.bp)
     app.register_blueprint(slicer_routes.bp)
     app.register_blueprint(auth_routes.bp)
-    app.register_blueprint(printer_bp)
+    app.register_blueprint(printer_routes.bp)
     #app.register_blueprint(octoprint_routes.bp)
 
     @app.route('/')

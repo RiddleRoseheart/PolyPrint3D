@@ -143,6 +143,54 @@ export const addColor = async (colorData) => {
   }
 };
 
+/**
+ * Pause a print job
+ * @param {string} printerId - ID of the printer
+ * @returns {Promise<Object>} Response data
+ * @throws {Error} If pausing fails
+ */
+export const pausePrintJob = async (printerId) => {
+  try {
+    const response = await axiosInstance.post(`/api/admin/printers/${printerId}/pause`);
+    return response.data;
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
+ * Resume a paused print job
+ * @param {string} printerId - ID of the printer
+ * @returns {Promise<Object>} Response data
+ * @throws {Error} If resuming fails
+ */
+export const resumePrintJob = async (printerId) => {
+  try {
+    const response = await axiosInstance.post(`/api/admin/printers/${printerId}/resume`);
+    return response.data;
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
+/**
+ * Cancel a print job
+ * @param {string} printerId - ID of the printer
+ * @returns {Promise<Object>} Response data
+ * @throws {Error} If cancellation fails
+ */
+export const cancelPrintJob = async (printerId) => {
+  try {
+    const response = await axiosInstance.post(`/api/admin/printers/${printerId}/cancel`);
+    return response.data;
+  } catch (error) {
+    handleError(error);
+    throw error;
+  }
+};
+
 const adminEndpoints = {
   getAllPrintersAdmin,
   addPrinter,
@@ -152,7 +200,10 @@ const adminEndpoints = {
   getMaterialsAdmin,
   addMaterial,
   getColorsAdmin,
-  addColor
+  addColor,
+  pausePrintJob,
+  resumePrintJob,
+  cancelPrintJob
 };
 
 export default adminEndpoints;
