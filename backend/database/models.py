@@ -2,6 +2,8 @@ from .config import db
 from datetime import datetime
 from flask_login import UserMixin
 from enum import Enum
+import enum
+from datetime import datetime
 
 class UserRole(Enum):
     """Available user roles"""
@@ -144,3 +146,29 @@ class Printer(db.Model):
     # Relationships
     print_requests = db.relationship('PrintRequest', back_populates='printer')
     filaments = db.relationship('Filament', back_populates='printer') 
+    
+
+class AlertType(enum.Enum):
+    INFO = "info"
+    SUCCESS = "success"
+    WARNING = "warning"
+    ERROR = "error"
+
+class Alert(db.Model):
+    """Model for storing system alerts and notifications"""
+    
+    id = db.Column(db.String(36), primary_key=True)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    type = db.Column(db.String(20), nullable=False, default=AlertType.INFO.value)
+    title = db.Column(db.String(100), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+    source = db.Column(db.String(100))  # e.g., "Printer", "System", etc.
+    source_id = db.Column(db.String(36))  # e.g., printer_id
+    is_read = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=True)
+    
+    # Relationships
+    user = db.relationship('User', backref=db.backref('alerts', lazy=True))
+    
+    
+    

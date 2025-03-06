@@ -4,6 +4,7 @@ import os
 from typing import Dict, Optional
 from pathlib import Path
 from backend.database.models import Printer, PrintRequest
+from backend.services.alert_service import AlertService, AlertType
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ class OctoPrintService:
     def __init__(self):
         """Initialize OctoPrint service"""
         self.logger = logging.getLogger(__name__)
+        self.alert_service = AlertService()
         
     def _get_headers(self, api_key: str) -> Dict:
         """Create HTTP headers for OctoPrint API requests"""
@@ -194,9 +196,7 @@ class OctoPrintService:
                 
         except Exception as e:
             self.logger.error(f"Error getting job status: {str(e)}")
-            return {"status": "error", "message": str(e)}
-        
-        
+            return {"status": "error", "message": str(e)}  
         
     def pause_print_job(self, printer: Printer) -> bool:
         """

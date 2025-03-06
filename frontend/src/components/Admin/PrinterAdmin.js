@@ -42,6 +42,7 @@ import {
   resumePrintJob,
   cancelPrintJob 
 } from '../../api/endpoints/adminEndpoints';
+import AlertSection from './AlertSection';
 
 const PrinterAdmin = () => {
   const [printers, setPrinters] = useState([]);
@@ -599,6 +600,8 @@ const PrinterAdmin = () => {
                   )}
                 </CardActions>
               </Card>
+
+              
             </Grid>
           ))}
           
@@ -620,7 +623,11 @@ const PrinterAdmin = () => {
               </Paper>
             </Grid>
           )}
-        </Grid>
+           {/* Alerts section */}
+  <Grid item xs={12} md={6} lg={4}>
+    <AlertSection />
+  </Grid>
+</Grid>
       )}
 
       {/* Add/Edit Printer Dialog */}
