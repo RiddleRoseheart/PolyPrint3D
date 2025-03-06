@@ -222,28 +222,42 @@ class SlicerService:
             stl_path: Path to STL file that was sliced
             job_name: Name of the job
         """
-        # Extract job and group information
-        job_part, group_name = PathUtil.extract_job_info(stl_path)
-        
-        if not job_part:
-            logger.warning(f"Could not extract job part from {stl_path}")
-            return
+        try:
+            # Extract material and color from the STL path
+            # Assuming the path follows the pattern: ...\group_material_color.stl
+            path_parts = os.path.splitext(os.path.basename(stl_path))[0].split('_')
             
-        # Find the gcode file
-        gcode_path = PathUtil.find_gcode_file(job_part, group_name)
-        
-        if gcode_path and os.path.exists(gcode_path):
-            logger.info(f"Found G-code file at: {gcode_path}")
+            # The group name should be just the material and color, without the 'group_' prefix
+            if len(path_parts) >= 3 and path_parts[0] == 'group':
+                group_name = '_'.join(path_parts[1:])
+            else:
+                group_name = '_'.join(path_parts)
             
-            # Create GCodeFile record
-            gcode_file = GCodeFile(
-                id=str(uuid.uuid4()),
-                file_path=str(gcode_path),
-                print_request_id=print_request.id
-            )
-            db.session.add(gcode_file)
-        else:
-            logger.warning(f"G-code file not found for STL: {stl_path}")
+            logger.info(f"Extracted Group Name: {group_name}")
+            
+            # Find the gcode file
+            gcode_remote_path, gcode_local_path = self.file_manager.get_job_file_paths(job_name, 'gcode', group_name)
+            
+            logger.info(f"Remote G-code Path: {gcode_remote_path}")
+            logger.info(f"Local G-code Path: {gcode_local_path}")
+            
+            if gcode_local_path and os.path.exists(gcode_local_path):
+                logger.info(f"Found G-code file at: {gcode_local_path}")
+                logger.info(f"G-code file size: {os.path.getsize(gcode_local_path)} bytes")
+                
+                # Create GCodeFile record
+                gcode_file = GCodeFile(
+                    id=str(uuid.uuid4()),
+                    file_path=str(gcode_local_path),
+                    print_request_id=print_request.id
+                )
+                db.session.add(gcode_file)
+                logger.info(f"Created GCodeFile record for print request {print_request.id}")
+            else:
+                logger.warning(f"G-code file not found or empty: {gcode_local_path}")
+        
+        except Exception as e:
+            logger.error(f"Error processing G-code file: {e}", exc_info=True)
     
     def get_gcode_file_path(self, request_id: str) -> Optional[Path]:
         """

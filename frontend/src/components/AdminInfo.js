@@ -247,11 +247,11 @@ const AdminInfo = () => {
                                             <TableCell>{user.email}</TableCell>
                                             <TableCell>
                                                 <Box component="span" sx={{
-                                                    px: 1,
+                                                    px: 3,
                                                     py: 0.5,
                                                     borderRadius: 1,
                                                     bgcolor: user.role === 'admin' ? 'primary.light' : 'success.light',
-                                                    color: 'white',
+                                                    color: 'black',
                                                     fontSize: '0.875rem',
                                                 }}>
                                                     {user.role}
