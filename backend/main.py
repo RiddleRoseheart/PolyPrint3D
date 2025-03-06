@@ -3,6 +3,7 @@ from flask_cors import CORS
 from backend.routes import file_routes, slicer_routes, auth_routes
 from backend.routes.printer import bp as printer_bp
 from pathlib import Path
+
 import os
 import sys
 from backend.database import init_db, db
@@ -10,9 +11,19 @@ from flask_login import LoginManager
 from flask_mail import Mail
 from backend.utils.dev_data import create_test_data
 from backend.database.models import User
+from backend.routes.octoprint_routes import bp as octoprint_bp
+from dotenv import load_dotenv
 
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+# Initialize extensions
 login_manager = LoginManager() 
 mail = Mail() 
+
+# Load environment variables
+load_dotenv()
 
 def init_login_manager(app):
     login_manager.init_app(app)
@@ -81,7 +92,7 @@ def create_app():
     app.config['UPLOAD_FOLDER'].mkdir(parents=True, exist_ok=True)
     app.config['OUTPUT_FOLDER'].mkdir(parents=True, exist_ok=True)
 
-#todo 
+#TODO 
     # Configure app
     app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
@@ -99,7 +110,7 @@ def create_app():
     app.config['FILE_MANAGER_USERNAME'] = 'local_user'  # Or get from environment
     app.config['FILE_MANAGER_PASSWORD'] = 'password'    # Or get from environment
     app.config['FILE_MANAGER_REMOTE_PATH'] = '/remote'
-    
+
     # Handle database reset
     if "--reset-db" in sys.argv:
         print("Resetting database...")
@@ -116,14 +127,13 @@ def create_app():
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(printer_bp)
     #app.register_blueprint(octoprint_routes.bp)
-    
+
     @app.route('/')
     def serve():
         return send_from_directory('../frontend/', 'index.html')
     
     return app
 
-()
 app = create_app()
 
 if __name__ == '__main__':
