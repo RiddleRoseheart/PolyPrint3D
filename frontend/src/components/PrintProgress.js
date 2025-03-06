@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getPrintJobDetails, pausePrintJob, resumePrintJob } from '../api/octoprintAPI';
 import { 
     Box, 
     Paper, 
@@ -98,7 +99,7 @@ const theme = createTheme({
   }
 });
 
-const PRINT_SPEED = 1000; // 1 second per percent
+const POLLING_INTERVAL = 5000; // Poll every 5 seconds
 const DISPLAY_NOTIFICATIONS = 5; // Number of notifications to show
 
 const PrintingProgress = ({ selectedFiles, onReset }) => {
@@ -113,6 +114,7 @@ const PrintingProgress = ({ selectedFiles, onReset }) => {
     ];
 
     // Initialize print jobs with settings
+
     const initializePrintJobs = useCallback(() => {
         const jobs = files.map((file, index) => ({
             id: `print_${Date.now()}_${index}`,
@@ -136,30 +138,43 @@ const PrintingProgress = ({ selectedFiles, onReset }) => {
         setPrintJobs(jobs);
     }, [files]);
 
+
     // Update progress for active prints
-    const updateJobProgress = useCallback(() => {
-        setPrintJobs(prev => prev.map(job => {
-            if (job.status === 'COMPLETED' || job.isPaused) return job;
+    const updateJobProgress = useCallback(async () => {
+        try {
+            const updatedJobs = await Promise.all(printJobs.map(async (job) => {
+                if (job.status === 'COMPLETED' || !job.printerIp || !job.printerApiKey) return job;
 
-            const newProgress = Math.min(job.progress + 1, 100);
-            const newStatus = newProgress === 100 ? 'COMPLETED' : 'PRINTING';
-            const newTimeRemaining = Math.max(
-                0, 
-                job.estimatedTime * (100 - newProgress) / 100
-            );
+                // Skip update if paused to avoid resetting the status
+                if (job.isPaused) return job;
 
-            if (newProgress === 100) {
-                addNotification(`Print completed: ${job.fileName}`);
-            }
+                try {
+                    const jobDetails = await getPrintJobDetails(job.printerIp, job.printerApiKey);
+                    const newProgress = jobDetails.completion || 0;
+                    const newStatus = newProgress >= 100 ? 'COMPLETED' : jobDetails.state;
+                    const newTimeRemaining = jobDetails.printTimeLeft / 60 || 0; // Convert seconds to minutes
 
-            return { 
-                ...job, 
-                progress: newProgress, 
-                status: newStatus,
-                timeRemaining: newTimeRemaining
-            };
-        }));
-    }, []);
+                    if (newProgress >= 100 && job.progress < 100) {
+                        addNotification(`Print completed: ${job.fileName}`);
+                    }
+
+                    return {
+                        ...job,
+                        progress: newProgress,
+                        status: newStatus,
+                        timeRemaining: newTimeRemaining
+                    };
+                } catch (error) {
+                    console.error(`Error updating job ${job.id}:`, error);
+                    return job;
+                }
+            }));
+
+            setPrintJobs(updatedJobs);
+        } catch (error) {
+            console.error('Error updating job progress:', error);
+        }
+    }, [printJobs]);
 
     // Initialize jobs on component mount
     useEffect(() => {
@@ -168,23 +183,40 @@ const PrintingProgress = ({ selectedFiles, onReset }) => {
 
     // Progress update interval
     useEffect(() => {
-        const interval = setInterval(updateJobProgress, PRINT_SPEED);
+        const interval = setInterval(updateJobProgress, POLLING_INTERVAL);
         return () => clearInterval(interval);
     }, [updateJobProgress]);
 
     // Handle individual print pause/resume
-    const togglePauseJob = (jobId) => {
-        setPrintJobs(prev => prev.map(job => {
-            if (job.id === jobId) {
-                const newIsPaused = !job.isPaused;
-                addNotification(`${job.fileName} ${newIsPaused ? 'paused' : 'resumed'}`);
-                return {
-                    ...job,
-                    isPaused: newIsPaused
-                };
+    const togglePauseJob = async (job) => {
+        if (!job.printerIp || !job.printerApiKey) {
+            addNotification(`Cannot control ${job.fileName}: No printer connection details`);
+            return;
+        }
+
+        try {
+            if (job.isPaused) {
+                await resumePrintJob(job.printerIp, job.printerApiKey);
+                addNotification(`Resumed: ${job.fileName}`);
+            } else {
+                await pausePrintJob(job.printerIp, job.printerApiKey);
+                addNotification(`Paused: ${job.fileName}`);
             }
-            return job;
-        }));
+
+            // Update the local state
+            setPrintJobs(prev => prev.map(j => {
+                if (j.id === job.id) {
+                    return {
+                        ...j,
+                        isPaused: !j.isPaused
+                    };
+                }
+                return j;
+            }));
+        } catch (error) {
+            console.error(`Failed to ${job.isPaused ? 'resume' : 'pause'} print:`, error);
+            addNotification(`Failed to ${job.isPaused ? 'resume' : 'pause'} ${job.fileName}: ${error.message}`);
+        }
     };
 
     // Add notification to queue
