@@ -1,6 +1,10 @@
 from flask import Blueprint, request, jsonify, session, redirect
 from flask_login import login_user, logout_user, login_required, current_user
 from marshmallow import Schema, fields
+from flask import Blueprint, request, jsonify, session
+from flask_login import login_user, logout_user, login_required, current_user
+from backend.database.models import PrintRequest  # Add this import
+from backend.database.config import db  # Add this import
 from backend.services.auth_service import (
     AuthService, 
     AuthError, 
@@ -125,15 +129,34 @@ def login() -> Tuple[Dict, int]:
     except Exception as e:
         logger.error(f"Login failed: {str(e)}")
         return jsonify({'error': 'Login failed'}), 500
-
 @bp.route('/api/auth/logout', methods=['POST'])
 @login_required
-def logout() -> Tuple[Dict, int]:
-    """Log out the current user"""
-    logger.info(f"User logged out: {current_user.email}")
-    logout_user()
-    session.clear()  # Clear the session on logout
-    return jsonify({'message': 'Logged out successfully'})
+def logout():
+    """Log out the current user and cancel any in-progress print requests"""
+    try:
+        # Cancel any processing print requests for this user
+        processing_requests = PrintRequest.query.filter_by(
+            user_id=current_user.id, 
+            state='processing'
+        ).all()
+        
+        for request in processing_requests:
+            request.state = 'cancelled'
+        
+        db.session.commit()
+        
+        #logger.info(f"Cancelled {len(processing_requests)} processing print requests for user {current_user.email}")
+        
+        # Standard logout procedure
+        logout_user()
+        session.clear()
+        
+        return jsonify({'message': 'Logged out successfully'})
+    
+    except Exception as e:
+        logger.error(f"Logout error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Logout failed'}), 500
 
 @bp.route('/api/auth/user', methods=['GET'])
 @login_required

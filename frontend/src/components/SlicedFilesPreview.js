@@ -37,10 +37,10 @@ const PreviewContainer = ({ children, isLoading }) => (
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                backgroundColor: 'rgba(31, 31, 31, 0.7)',
                 zIndex: 10,
             }}>
-                <CircularProgress />
+                <CircularProgress sx={{ color: 'white' }} />
             </Box>
         )}
     </Box>
@@ -207,12 +207,12 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
         scene.add(ambientLight);
         
         // Directional light (sun-like)
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
         directionalLight.position.set(1, 1, 1);
         scene.add(directionalLight);
         
         // Back light for better definition
-        const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        const backLight = new THREE.DirectionalLight(0xffffff, 3);
         backLight.position.set(-1, -1, -1);
         scene.add(backLight);
     }, []);
@@ -244,7 +244,7 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
             console.log('Creating scene');
             // Create scene
             const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf5f5f5);
+            scene.background = new THREE.Color(0x000000); // Black background for monochrome theme
             sceneRef.current = scene;
 
             // Get container dimensions
@@ -396,8 +396,8 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
 
     // Get material color from request
     const getMaterialColor = useCallback((request) => {
-        // Default to green
-        let materialColor = 0x00ff00;
+        // Default to white for monochrome theme
+        let materialColor = 0xffffff;
         
         if (request?.filaments && request.filaments[0]?.color) {
             const colorString = request.filaments[0].color;
@@ -407,20 +407,8 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
                 if (colorString.startsWith('#')) {
                     materialColor = parseInt(colorString.replace('#', '0x'), 16);
                 } else if (typeof colorString === 'string') {
-                    // Handle named colors (basic ones only)
-                    const colorMap = {
-                        'black': 0x000000,
-                        'white': 0xffffff,
-                        'red': 0xff0000,
-                        'green': 0x00ff00,
-                        'blue': 0x0000ff,
-                        'yellow': 0xffff00,
-                        'orange': 0xffa500,
-                        'purple': 0x800080,
-                        'gray': 0x808080,
-                        'grey': 0x808080
-                    };
-                    materialColor = colorMap[colorString.toLowerCase()] || 0x00ff00;
+                    // For monochrome theme, all colors are white with varying brightness
+                    materialColor = 0xffffff; // Use white for all colors
                 }
             } catch (e) {
                 console.warn('Error parsing color:', e);
@@ -470,11 +458,13 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
             const activeRequest = slicingResult?.print_requests?.find(r => r.id === requestId);
             const materialColor = getMaterialColor(activeRequest);
             
-            // Create mesh
+            // Create mesh with white material for monochrome theme
             const material = new THREE.MeshPhongMaterial({
                 color: materialColor,
-                specular: 0x111111,
-                shininess: 200
+                specular: 0x444444,
+                shininess: 100,
+                emissive: 0x222222,
+                emissiveIntensity: 0.1
             });
             
             const mesh = new THREE.Mesh(geometry, material);
@@ -736,190 +726,298 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
     }, [slicingResult?.print_requests]);
 
     return (
-        <Stack spacing={3} sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
-            <Paper elevation={3} sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                    Sliced Files Preview
-                </Typography>
+        <Stack spacing={3} sx={{ maxWidth: 2000, mt: 4, p: 2 }} border='5px solid rgb(54, 54, 54)'>
+            <Paper 
+                elevation={3} 
+                sx={{ 
+                    p: 0, 
+                    borderRadius: 0,
+                    border: '1px solid #222222',
+                    background: '#111111',
+                    color: '#ffffff',
+                    boxShadow: '0 15px 35px rgba(0, 0, 0, 0.5)'
+                }}
+            >
+                <Box sx={{ 
+                    p: 2, 
+                    borderBottom: '1px solid #222222',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)'
+                }}>
+                    <Typography 
+                        variant="h6" 
+                        sx={{ 
+                            fontWeight: 'bold',
+                            letterSpacing: '0.02em'
+                        }}
+                    >
+                        Sliced Files Preview
+                    </Typography>
+                </Box>
 
                 {error && (
-                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                    <Alert 
+                        severity="error" 
+                        sx={{ 
+                            m: 2, 
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+                            color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                        }} 
+                        onClose={() => setError('')}
+                    >
                         {error}
                     </Alert>
                 )}
 
-                <Grid container spacing={2}>
-                    <Grid item xs={12} md={8}>
-                        <Box 
-                            sx={{ 
-                                position: 'relative',
-                                height: 400,
-                                width: '100%',
-                                border: '1px solid #eee',
-                                borderRadius: 1,
-                                backgroundColor: '#f5f5f5',
-                                overflow: 'hidden'
-                            }}
-                        >
-                            {!webGLAvailable ? (
-                                <Box sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    height: '100%',
-                                    p: 2,
-                                    textAlign: 'center'
-                                }}>
-                                    <Typography variant="body1" color="error">
-                                        WebGL is not supported in your browser.<br />
-                                        3D preview requires WebGL support.
-                                    </Typography>
-                                </Box>
-                            ) : (
-                                <PreviewContainer isLoading={isLoading}>
-                                    <Box 
-                                        ref={containerRef} 
-                                        sx={{ height: '100%', width: '100%' }} 
-                                    />
-                                    
-                                    {!activePreview && !isLoading && (
-                                        <Box sx={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                                            zIndex: 5,
-                                        }}>
-                                            <Typography variant="body1" color="text.secondary">
-                                                {printRequests.length > 0 
-                                                    ? 'Select a print request to view preview' 
-                                                    : 'No preview available'}
-                                            </Typography>
-                                        </Box>
-                                    )}
-                                    
-                                    {previewRequestStatus.error && !isLoading && (
-                                        <Box sx={{
-                                            position: 'absolute',
-                                            bottom: 0,
-                                            left: 0,
-                                            right: 0,
-                                            p: 1,
-                                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                            zIndex: 5,
-                                        }}>
-                                            <Typography variant="body2" color="error">
-                                                Failed to load preview: {previewRequestStatus.error}
-                                            </Typography>
-                                        </Box>
-                                    )}
-                                </PreviewContainer>
-                            )}
-                        </Box>
-                        
-                        {activePreview && (
-                            <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
-                                <Tooltip title="Reset View">
-                                    <Button 
-                                        size="small" 
-                                        onClick={handleResetView}
-                                        startIcon={<RotateLeftIcon />}
-                                    >
-                                        Reset View
-                                    </Button>
-                                </Tooltip>
+                <Box sx={{ p: 2 }}>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} md={8}>
+                            <Box 
+                                sx={{ 
+                                    position: 'relative',
+                                    height: 400,
+                                    width: '100%',
+                                    border: '1px solid #222222',
+                                    borderRadius: 0,
+                                    backgroundColor: '#050505',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                {!webGLAvailable ? (
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        height: '100%',
+                                        p: 2,
+                                        textAlign: 'center',
+                                        color: '#aaaaaa'
+                                    }}>
+                                        <Typography variant="body1" color="#ffffff">
+                                            WebGL is not supported in your browser.<br />
+                                            3D preview requires WebGL support.
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    <PreviewContainer isLoading={isLoading}>
+                                        <Box 
+                                            ref={containerRef} 
+                                            sx={{ height: '100%', width: '100%' }} 
+                                        />
+                                        
+                                        {!activePreview && !isLoading && (
+                                            <Box sx={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                                zIndex: 5,
+                                            }}>
+                                                <Typography variant="body1" color="#aaaaaa">
+                                                    {printRequests.length > 0 
+                                                        ? 'Select a print request to view preview' 
+                                                        : 'No preview available'}
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                        
+                                        {previewRequestStatus.error && !isLoading && (
+                                            <Box sx={{
+                                                position: 'absolute',
+                                                bottom: 0,
+                                                left: 0,
+                                                right: 0,
+                                                p: 1,
+                                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                                zIndex: 5,
+                                            }}>
+                                                <Typography variant="body2" color="#ffffff">
+                                                    Failed to load preview: {previewRequestStatus.error}
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                    </PreviewContainer>
+                                )}
                             </Box>
-                        )}
-                    </Grid>
-                    
-                    <Grid item xs={12} md={4}>
-                        <Typography variant="subtitle2" gutterBottom>
-                            Print Requests
-                        </Typography>
-                        
-                        <Stack spacing={2} sx={{ maxHeight: 400, overflowY: 'auto', pr: 1 }}>
-                            {slicingResult?.print_requests?.map((request) => (
-                                <Card 
-                                    key={request.id}
-                                    variant="outlined"
-                                    sx={{ 
-                                        cursor: 'pointer',
-                                        bgcolor: selectedRequests.has(request.id) ? 'action.selected' : 'inherit',
-                                        border: activePreview?.id === request.id ? '2px solid #1976d2' : '1px solid rgba(0, 0, 0, 0.12)'
-                                    }}
-                                >
-                                    <CardContent onClick={() => handleRequestToggle(request)}>
-                                        <Typography variant="subtitle1">
-                                            {request.filaments?.[0]?.name || 'Unknown Material'}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Infill: {request.filling}% | Layer: {request.layer}mm
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Color: {request.filaments?.[0]?.color || 'Unknown'}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Material: {request.filaments?.[0]?.material || 'Unknown'}
-                                        </Typography> 
-                                    </CardContent>
-
-                                    <CardActions>
+                            
+                            {activePreview && (
+                                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
+                                    <Tooltip title="Reset View">
                                         <Button 
                                             size="small" 
-                                            onClick={() => setActivePreview(request)}
-                                            variant={activePreview?.id === request.id ? "contained" : "text"}
-                                        >
-                                            {activePreview?.id === request.id ? "Viewing" : "Preview"}
-                                        </Button>
-                                        <Button
-                                            size="small"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDownload(request);
+                                            onClick={handleResetView}
+                                            startIcon={<RotateLeftIcon />}
+                                            sx={{
+                                                color: '#aaaaaa',
+                                                '&:hover': {
+                                                    color: '#ffffff',
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                                }
                                             }}
-                                            disabled={isDownloading}
-                                            startIcon={<DownloadIcon />}
                                         >
-                                            Download
+                                            Reset View
                                         </Button>
-                                    </CardActions>
-                                </Card>
-                            ))}
-                            
-                            {(!slicingResult?.print_requests || slicingResult.print_requests.length === 0) && (
-                                <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
-                                    No print requests available
-                                </Typography>
+                                    </Tooltip>
+                                </Box>
                             )}
-                        </Stack>
+                        </Grid>
+                        
+                        <Grid item xs={12} md={4}>
+                            <Typography 
+                                variant="subtitle2" 
+                                gutterBottom
+                                sx={{ 
+                                    color: '#ffffff',
+                                    fontWeight: 600,
+                                    letterSpacing: '0.02em'
+                                }}
+                            >
+                                Print Requests
+                            </Typography>
+                            
+                            <Stack spacing={2} sx={{ maxHeight: 400, overflowY: 'auto', pr: 1 }}>
+                                {slicingResult?.print_requests?.map((request) => (
+                                    <Card 
+                                        key={request.id}
+                                        variant="outlined"
+                                        sx={{ 
+                                            cursor: 'pointer',
+                                            bgcolor: selectedRequests.has(request.id) ? 'rgba(255, 255, 255, 0.1)' : '#0a0a0a',
+                                            border: activePreview?.id === request.id ? '2px solid #ffffff' : '1px solid #333333',
+                                            borderRadius: 0,
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': {
+                                                borderColor: '#555555'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent 
+                                            onClick={() => handleRequestToggle(request)}
+                                            sx={{
+                                                p: 2,
+                                                '&:last-child': { pb: 2 },
+                                                color: '#ffffff'
+                                            }}
+                                        >
+                                            <Typography 
+                                                variant="subtitle1"
+                                                sx={{ 
+                                                    fontWeight: 600,
+                                                    color: '#ffffff'
+                                                }}
+                                            >
+                                                {request.filaments?.[0]?.name || 'Unknown Material'}
+                                            </Typography>
+                                            <Typography variant="body2" color="#aaaaaa">
+                                                Infill: {request.filling}% | Layer: {request.layer}mm
+                                            </Typography>
+                                            <Typography variant="body2" color="#aaaaaa">
+                                                Color: {request.filaments?.[0]?.color || 'Unknown'}
+                                            </Typography>
+                                            <Typography variant="body2" color="#aaaaaa">
+                                                Material: {request.filaments?.[0]?.material || 'Unknown'}
+                                            </Typography> 
+                                        </CardContent>
+
+                                        <CardActions sx={{ p: 1.5, borderTop: '1px solid #222222' }}>
+                                            <Button 
+                                                size="small" 
+                                                onClick={() => setActivePreview(request)}
+                                                variant={activePreview?.id === request.id ? "contained" : "outlined"}
+                                                sx={{
+                                                    borderRadius: 0,
+                                                    ...(activePreview?.id === request.id 
+                                                        ? {
+                                                            bgcolor: '#ffffff',
+                                                            color: '#000000',
+                                                            border: '1px solid #ffffff',
+                                                            '&:hover': {
+                                                                bgcolor: '#dddddd',
+                                                                color: '#000000'
+                                                            }
+                                                        } 
+                                                        : {
+                                                            color: '#aaaaaa',
+                                                            borderColor: '#555555',
+                                                            '&:hover': {
+                                                                borderColor: '#ffffff',
+                                                                color: '#ffffff'
+                                                            }
+                                                        }
+                                                    )
+                                                }}
+                                            >
+                                                {activePreview?.id === request.id ? "Viewing" : "Preview"}
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDownload(request);
+                                                }}
+                                                disabled={isDownloading}
+                                                startIcon={<DownloadIcon />}
+                                                sx={{
+                                                    color: '#aaaaaa',
+                                                    ml: 1,
+                                                    '&:hover': {
+                                                        color: '#ffffff',
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                                    },
+                                                    '&.Mui-disabled': {
+                                                        color: '#444444'
+                                                    }
+                                                }}
+                                            >
+                                                Download
+                                            </Button>
+                                        </CardActions>
+                                    </Card>
+                                ))}
+                                
+                                {(!slicingResult?.print_requests || slicingResult.print_requests.length === 0) && (
+                                    <Typography variant="body2" color="#aaaaaa" sx={{ p: 2, textAlign: 'center' }}>
+                                        No print requests available
+                                    </Typography>
+                                )}
+                            </Stack>
+                        </Grid>
                     </Grid>
-                </Grid>
+                </Box>
 
                 {/* Pricing Summary */}
-                <Box sx={{ mt: 3 }}>
-                    <Divider sx={{ mb: 2 }} />
+                <Box sx={{ px: 2, pt: 2, pb: 3 }}>
+                    <Divider sx={{ mb: 2, borderColor: '#333333' }} />
                     <Grid container spacing={2}>
                         <Grid item xs={12} md={6}>
                             <Stack spacing={1}>
-                                <Typography variant="subtitle2">
+                                <Typography variant="subtitle2" color="#aaaaaa">
                                     Selected Items: {selectedRequests.size} of {slicingResult?.print_requests?.length || 0}
                                 </Typography>
-                                <Typography variant="h6" color="primary">
+                                <Typography 
+                                    variant="h6" 
+                                    color="#ffffff"
+                                    sx={{ fontWeight: 600 }}
+                                >
                                     Selected Total: {formatPrice(calculateSelectedPrice())}
                                 </Typography>
                             </Stack>
                         </Grid>
                         <Grid item xs={12} md={6}>
-                            <Stack spacing={1} sx={{ textAlign: 'right' }}>
-                                <Typography variant="subtitle2">
+                            <Stack spacing={1} sx={{ textAlign: {xs: 'left', md: 'right'} }}>
+                                <Typography variant="subtitle2" color="#aaaaaa">
                                     Project Summary
                                 </Typography>
-                                <Typography variant="h6">
+                                <Typography 
+                                    variant="h6"
+                                    color="#ffffff"
+                                    sx={{ fontWeight: 600 }}
+                                >
                                     Total Project Price: {formatPrice(getTotalPrice())}
                                 </Typography>
                             </Stack>
@@ -927,12 +1025,38 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
                     </Grid>
                 </Box>
 
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
-                    <Stack direction="row" spacing={2}>
+                <Box 
+                    sx={{ 
+                        px: 2, 
+                        py: 3, 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        borderTop: '1px solid #222222',
+                        flexDirection: {xs: 'column', sm: 'row'},
+                        gap: 2,
+                        backgroundColor: 'rgba(0, 0, 0, 0.3)'
+                    }}
+                >
+                    <Stack 
+                        direction={{xs: 'column', sm: 'row'}} 
+                        spacing={2}
+                        sx={{ width: {xs: '100%', sm: 'auto'} }}
+                    >
                         <Button
                             variant="outlined"
                             onClick={onReset}
                             startIcon={<RotateLeftIcon />}
+                            sx={{
+                                border: '1px solid #555555',
+                                color: '#aaaaaa',
+                                borderRadius: 0,
+                                py: 1,
+                                '&:hover': {
+                                    borderColor: '#ffffff',
+                                    color: '#ffffff',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                }
+                            }}
                         >
                             Start Over
                         </Button>
@@ -941,6 +1065,21 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
                             onClick={handleSelectAll}
                             startIcon={<SelectAllIcon />}
                             disabled={!slicingResult?.print_requests?.length}
+                            sx={{
+                                border: '1px solid #555555',
+                                color: '#aaaaaa',
+                                borderRadius: 0,
+                                py: 1,
+                                '&:hover': {
+                                    borderColor: '#ffffff',
+                                    color: '#ffffff',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                },
+                                '&.Mui-disabled': {
+                                    borderColor: '#333333',
+                                    color: '#444444'
+                                }
+                            }}
                         >
                             {selectedRequests.size === slicingResult?.print_requests?.length ? 'Deselect All' : 'Select All'}
                         </Button>
@@ -954,6 +1093,32 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
                             variant="contained"
                             onClick={handleDownloadFiles}
                             disabled={selectedRequests.size === 0 || isDownloading}
+                            sx={{
+                                backgroundColor: 'transparent',
+                                border: '2px solid #ffffff',
+                                color: '#ffffff',
+                                borderRadius: 0,
+                                py: 1,
+                                fontWeight: 600,
+                                letterSpacing: '0.02em',
+                                transition: 'all 0.3s ease',
+                                boxShadow: 'none',
+                                width: {xs: '100%', sm: 'auto'},
+                                '&:hover': {
+                                    backgroundColor: '#ffffff',
+                                    color: '#000000',
+                                    boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
+                                    transform: 'translateY(-3px)'
+                                },
+                                '&.Mui-disabled': {
+                                    backgroundColor: 'transparent',
+                                    borderColor: '#333333',
+                                    color: '#444444'
+                                },
+                                '& .MuiLoadingButton-loadingIndicator': {
+                                    color: '#ffffff'
+                                }
+                            }}
                         >
                             {isDownloading ? 'Downloading...' : `Download Selected (${formatPrice(calculateSelectedPrice())})`}
                         </LoadingButton>
@@ -965,6 +1130,32 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
                             variant="contained"
                             onClick={() => onPrintStart(Array.from(selectedRequests))}
                             disabled={selectedRequests.size === 0 || isLoading}
+                            sx={{
+                                backgroundColor: 'transparent',
+                                border: '2px solid #ffffff',
+                                color: '#ffffff',
+                                borderRadius: 0,
+                                py: 1,
+                                fontWeight: 600,
+                                letterSpacing: '0.02em',
+                                transition: 'all 0.3s ease',
+                                boxShadow: 'none',
+                                width: {xs: '100%', sm: 'auto'},
+                                '&:hover': {
+                                    backgroundColor: '#ffffff',
+                                    color: '#000000',
+                                    boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
+                                    transform: 'translateY(-3px)'
+                                },
+                                '&.Mui-disabled': {
+                                    backgroundColor: 'transparent',
+                                    borderColor: '#333333',
+                                    color: '#444444'
+                                },
+                                '& .MuiLoadingButton-loadingIndicator': {
+                                    color: '#ffffff'
+                                }
+                            }}
                         >
                             {isLoading ? 'Starting Print...' : `Print Selected (${formatPrice(calculateSelectedPrice())})`}
                         </LoadingButton>

@@ -10,7 +10,7 @@ const Navbar = ({ user, setUser }) => {
         try {
             await logout();
             setUser(null);
-            navigate('/Landing'); // Redirect to Landing Page after logout
+            window.location.href = '/Landing'; // Redirect to Landing Page after logout
         } catch (error) {
             console.error('Logout failed:', error);
         }

@@ -13,20 +13,37 @@ import {
     Paper, 
     Alert,
     CircularProgress,
-    Button
+    Button,
+    Zoom,
+    Fade,
+    Divider,
+    Chip,
+    Grid,
+    Tooltip,
+    useTheme
 } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { getFileContent, analyzeSTLFile } from '../api/endpoints/fileEndpoints';
 import { sliceSTLFile, getMaterials, getColors } from '../api/endpoints/slicerEndpoints';
 import MultiObjectSettings from './MultiObjectSettings';
+import ModelIcon from '@mui/icons-material/ViewInAr';
+import CameraIcon from '@mui/icons-material/CameraAlt';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import SpeedIcon from '@mui/icons-material/Speed';
+import LayersIcon from '@mui/icons-material/Layers';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 const PRINT_SETTINGS = {
     QUALITY_LEVELS: [
-        { value: 'LOW', label: 'Low (0.3mm)' },
-        { value: 'MEDIUM', label: 'Medium (0.2mm)' },
-        { value: 'HIGH', label: 'High (0.1mm)' }
+        { value: 'LOW', label: 'Low (0.3mm)'},
+        { value: 'MEDIUM', label: 'Medium (0.2mm)'},
+        { value: 'HIGH', label: 'High (0.1mm)'}
     ],
-    INFILL_LEVELS: [20, 50, 80]
+    INFILL_LEVELS: [
+        { value: 20, label: '20% - Light' },
+        { value: 50, label: '50% - Standard' },
+        { value: 80, label: '80% - Strong' }
+    ]
 };
 
 // Helper function to check if WebGL is available
@@ -41,7 +58,9 @@ const isWebGLAvailable = () => {
     }
 };
 
-const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
+const PrintSettings = ({ fileData, onSlicingComplete = () => {}, onReset }) => {
+    const theme = useTheme();
+
     // State for print settings
     const [printSettings, setPrintSettings] = useState({
         quality: 'MEDIUM',
@@ -65,6 +84,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
     const [materials, setMaterials] = useState({});
     const [colors, setColors] = useState({});
     const [objectSettings, setObjectSettings] = useState([]);
+    const [showDebug, setShowDebug] = useState(false);
 
     // THREE.js refs
     const mountRef = useRef(null);
@@ -276,7 +296,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
             try {
                 // Initialize scene
                 const scene = new THREE.Scene();
-                scene.background = new THREE.Color(0xf5f5f5);
+                scene.background = new THREE.Color(0x000000); // Black background
                 sceneRef.current = scene;
                 
                 // Get container dimensions
@@ -393,11 +413,13 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
                     setPreviewStatus(prev => ({ ...prev, parsingComplete: true }));
                     setDebugInfo({ stage: 'stl_parsed', message: 'STL file parsed successfully' });
                     
-                    // Create material and mesh
+                    // Create material and mesh with white highlight instead of red
                     const material = new THREE.MeshPhongMaterial({
-                        color: 0x00ff00,
-                        specular: 0x111111,
-                        shininess: 200
+                        color: 'white', // White color
+                        specular: '0x444444',
+                        shininess: 1000,
+                        emissive: 0x222224, // Slight glow
+                        emissiveIntensity: 20
                     });
                     
                     const mesh = new THREE.Mesh(geometry, material);
@@ -458,7 +480,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
             if (stlFile && mountRef.current) {
                 // Create a new scene
                 const scene = new THREE.Scene();
-                scene.background = new THREE.Color(0xf5f5f5);
+                scene.background = new THREE.Color('black'); // Black background
                 sceneRef.current = scene;
                 
                 // Get container dimensions
@@ -582,148 +604,450 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {} }) => {
         }
     };
 
-    return (
-        <Stack spacing={3} sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
-            {/* Main preview section */}
-            <Paper elevation={3} sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                    3D Model Preview
-                </Typography>
+    // Reset camera view
+    const handleResetCamera = () => {
+        if (!meshRef.current || !cameraRef.current || !controlsRef.current) return;
+        
+        // Get bounding box to calculate best camera position
+        const box = new THREE.Box3().setFromObject(meshRef.current);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        
+        // Reset camera
+        cameraRef.current.position.set(0, maxDim * 0.8, maxDim * 2);
+        cameraRef.current.lookAt(0, 0, 0);
+        
+        // Reset controls
+        controlsRef.current.target.set(0, 0, 0);
+        controlsRef.current.update();
+        
+        // Force a render
+        if (rendererRef.current && sceneRef.current && cameraRef.current) {
+            rendererRef.current.render(sceneRef.current, cameraRef.current);
+        }
+    };
 
-                {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {error}
-                    </Alert>
-                )}
-                
-                {/* Debug info panel */}
-                <Alert severity="info" sx={{ mb: 2 }}>
-                    <Typography variant="body2" gutterBottom>
-                        <strong>Debug:</strong> {debugInfo.stage} - {debugInfo.message}
-                    </Typography>
-                    <Typography variant="body2">
-                        WebGL: {previewStatus.webGLAvailable ? '✅' : '❌'} | 
-                        File: {previewStatus.fileLoaded ? '✅' : '❌'} | 
-                        Parsed: {previewStatus.parsingComplete ? '✅' : '❌'} | 
-                        Scene: {previewStatus.sceneReady ? '✅' : '❌'}
-                    </Typography>
-                    <Button size="small" onClick={handleForceReload}>
-                        Force Reload Preview
-                    </Button>
-                </Alert>
-                
-                {isAnalyzing ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
-                        <CircularProgress />
-                        <Typography variant="body1" sx={{ ml: 2 }}>
-                            Analyzing 3D model...
+    // Find quality level label
+    const getQualityLabel = (value) => {
+        const quality = PRINT_SETTINGS.QUALITY_LEVELS.find(q => q.value === value);
+        return quality ? quality.label : value;
+    };
+
+    return (
+        <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
+            <Zoom in={true} timeout={500}>
+                <Paper 
+                    elevation={3} 
+                    sx={{ 
+                        p: 0, 
+                        mb: 3, 
+                        overflow: 'hidden',
+                        borderRadius: 0,
+                        border: '1px solid rgb(236, 236, 236)',
+                        background: '#111111',
+                        boxShadow: '0 15px 35px rgba(19, 19, 19, 0.5)'
+                    }}
+                >
+                    <Box sx={{ 
+                        bgcolor: '#000000',
+                        color: 'white',
+                        p: 2, 
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderBottom: '1px solid #222222'
+                    }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <ModelIcon sx={{ mr: 1 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 'bold', letterSpacing: '0.02em' }}>
+                                3D Model Preview
+                            </Typography>
+                        </Box>
+                    </Box>
+
+                    {error && (
+                        <Alert 
+                            severity="error" 
+                            sx={{ 
+                                m: 2,
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                                color: '#ffffff'
+                            }}
+                            onClose={() => setError('')}
+                        >
+                            {error}
+                        </Alert>
+                    )}
+
+                    
+                    {isAnalyzing ? (
+                        <Box sx={{ 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            justifyContent: 'center', 
+                            alignItems: 'center', 
+                            height: 400,
+                            bgcolor: '#050505'
+                        }}>
+                            <CircularProgress sx={{ color: 'white', mb: 2 }} />
+                            <Typography variant="body1" sx={{ color: '#aaaaaa' }}>
+                                Analyzing 3D model...
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Box sx={{ position: 'relative' }}>
+                            <Box 
+                                ref={mountRef} 
+                                sx={{ 
+                                    height: 400, 
+                                    width: 800,
+                                    
+                                    overflow: 'hidden',
+                                    position: 'relative',
+                                    bgcolor: '#050505',
+                                }} 
+                            >
+                                {(!stlFile || !previewStatus.fileLoaded) && (
+                                    <Box sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                        zIndex: 1
+                                    }}>
+                                        <Typography variant="body1" color="#aaaaaa">
+                                            {fileData ? 'Loading 3D model...' : 'No 3D model loaded'}
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                            
+                            {meshRef.current && previewStatus.sceneReady && (
+                                <Box sx={{
+                                    position: 'absolute',
+                                    bottom: 16,
+                                    right: 16,
+                                    zIndex: 2
+                                }}>
+                                    <Tooltip title="Reset Camera View">
+                                        <Button
+                                            variant="contained"
+                                            onClick={handleResetCamera}
+                                            size="small"
+                                            sx={{
+                                                minWidth: 'auto',
+                                                width: 36,
+                                                height: 36,
+                                                borderRadius: 0,
+                                                bgcolor: 'rgba(255, 255, 255, 0.2)',
+                                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                                boxShadow: '0 5px 15px rgba(0, 0, 0, 0.5)',
+                                                '&:hover': {
+                                                    bgcolor: 'rgba(255, 255, 255, 0.3)'
+                                                }
+                                            }}
+                                        >
+                                            <CameraIcon fontSize="small" />
+                                        </Button>
+                                    </Tooltip>
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+                </Paper>
+            </Zoom>
+            
+            {/* Global settings section */}
+            <Fade in={true} timeout={800} style={{ transitionDelay: '200ms' }}>
+                <Paper 
+                    elevation={3} 
+                    sx={{ 
+                        p: 3, 
+                        mb: 3,
+                        borderRadius: 0,
+                        border: '1px solid rgb(211, 211, 211)',
+                        background: '#111111',
+                        boxShadow: '0 15px 35px rgba(24, 24, 24, 0.5)'
+                    }}
+                >
+                    <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        mb: 2 
+                    }}>
+                        <SettingsIcon 
+                            sx={{ 
+                                mr: 1, 
+                                color: 'white',
+                                fontSize: 28
+                            }} 
+                        />
+                        <Typography 
+                            variant="h6" 
+                            sx={{ 
+                                fontWeight: 'bold',
+                                color: 'white',
+                                letterSpacing: '0.02em'
+                            }}
+                        >
+                            Global Print Settings
                         </Typography>
                     </Box>
-                ) : (
-                    <Box 
-                        ref={mountRef} 
-                        sx={{ 
-                            height: 400, 
-                            width: '100%', 
-                            mb: 3,
-                            border: '1px solid #eee',
-                            borderRadius: 1,
-                            overflow: 'hidden',
-                            backgroundColor: '#f5f5f5',
-                            position: 'relative'
-                        }} 
-                    >
-                        {(!stlFile || !previewStatus.fileLoaded) && (
-                            <Box sx={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                                zIndex: 1
+                    <Divider sx={{ mb: 3, borderColor: '#333333' }} />
+
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                            <Box sx={{ 
+                                p: 2, 
+                                border: '1px solid #333333',
+                                borderRadius: 0,
+                                bgcolor: '#0a0a0a'
                             }}>
-                                <Typography variant="body1" color="text.secondary">
-                                    {fileData ? 'Loading 3D model...' : 'No 3D model loaded'}
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    mb: 2 
+                                }}>
+                                    <LayersIcon 
+                                        sx={{ 
+                                            mr: 1, 
+                                            color: 'white' 
+                                        }} 
+                                    />
+                                    <Typography variant="subtitle1" fontWeight="bold" color="white">
+                                        Quality
+                                    </Typography>
+                                </Box>
+                                
+                                <FormControl fullWidth sx={{ 
+                                    '& .MuiOutlinedInput-root': {
+                                        color: 'white',
+                                        '& fieldset': {
+                                            borderColor: '#333333',
+                                        },
+                                        '&:hover fieldset': {
+                                            borderColor: '#555555',
+                                        },
+                                        '&.Mui-focused fieldset': {
+                                            borderColor: 'white',
+                                        }
+                                    },
+                                    '& .MuiInputLabel-root': {
+                                        color: '#aaaaaa'
+                                    }
+                                }}>
+                                    <InputLabel>Layer Quality</InputLabel>
+                                    <Select
+                                        value={printSettings.quality}
+                                        label="Layer Quality"
+                                        onChange={(e) => handleSettingChange('quality', e.target.value)}
+                                    >
+                                        {PRINT_SETTINGS.QUALITY_LEVELS.map(({ value, label, icon }) => (
+                                            <MenuItem key={value} value={value} sx={{color: 'white'}}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ marginRight: 8 }}>{icon}</span>
+                                                    {label}
+                                                </Box>
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                
+                                <Typography variant="body2" color="#aaaaaa" sx={{ mt: 1 }}>
+                                    Selected: <Chip 
+                                        size="small" 
+                                        label={getQualityLabel(printSettings.quality)} 
+                                        sx={{ 
+                                            ml: 1, 
+                                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                                            color: 'white' ,
+                                            fontWeight: 'medium'
+                                        }} 
+                                    />
                                 </Typography>
                             </Box>
-                        )}
-                    </Box>
-                )}
-            </Paper>
+                        </Grid>
 
-            {/* Global settings section */}
-            <Paper elevation={3} sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                    Global Print Settings
-                </Typography>
-
-                <Stack spacing={2} direction={{ xs: 'column', md: 'row' }}>
-                    <FormControl fullWidth>
-                        <InputLabel>Quality</InputLabel>
-                        <Select
-                            value={printSettings.quality}
-                            label="Quality"
-                            onChange={(e) => handleSettingChange('quality', e.target.value)}
-                        >
-                            {PRINT_SETTINGS.QUALITY_LEVELS.map(({ value, label }) => (
-                                <MenuItem key={value} value={value}>
-                                    {label}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth>
-                        <InputLabel>Infill</InputLabel>
-                        <Select
-                            value={printSettings.infill}
-                            label="Infill"
-                            onChange={(e) => handleSettingChange('infill', e.target.value)}
-                        >
-                            {PRINT_SETTINGS.INFILL_LEVELS.map(level => (
-                                <MenuItem key={level} value={level}>
-                                    {`${level}%`}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                </Stack>
-            </Paper>
+                        <Grid item xs={12} md={6}>
+                            <Box sx={{ 
+                                p: 2, 
+                                border: '1px solid #333333',
+                                borderRadius: 0,
+                                bgcolor: '#0a0a0a'
+                            }}>
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    mb: 2 
+                                }}>
+                                    <SpeedIcon 
+                                        sx={{ 
+                                            mr: 1, 
+                                            color: 'white' 
+                                        }} 
+                                    />
+                                    <Typography variant="subtitle1" fontWeight="bold" color="white">
+                                        Infill
+                                    </Typography>
+                                </Box>
+                                
+                                <FormControl fullWidth sx={{ 
+                                    '& .MuiOutlinedInput-root': {
+                                        color: 'white',
+                                        '& fieldset': {
+                                            borderColor: '#333333',
+                                        },
+                                        '&:hover fieldset': {
+                                            borderColor: '#555555',
+                                        },
+                                        '&.Mui-focused fieldset': {
+                                            borderColor: 'white',
+                                        }
+                                    },
+                                    '& .MuiInputLabel-root': {
+                                        color: '#aaaaaa'
+                                    }
+                                }}>
+                                    <InputLabel>Infill Density</InputLabel>
+                                    <Select
+                                        value={printSettings.infill}
+                                        label="Infill Density"
+                                        onChange={(e) => handleSettingChange('infill', e.target.value)}
+                                    >
+                                        {PRINT_SETTINGS.INFILL_LEVELS.map(({ value, label }) => (
+                                            <MenuItem key={value} value={value} sx={{color: 'white'}}>
+                                                {label}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                
+                                <Typography variant="body2" color="#aaaaaa" sx={{ mt: 1 }}>
+                                    Selected: <Chip 
+                                        size="small" 
+                                        label={`${printSettings.infill}%`} 
+                                        sx={{ 
+                                            ml: 1, 
+                                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                                            color: 'white',
+                                            fontWeight: 'medium'
+                                        }} 
+                                    />
+                                </Typography>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </Paper>
+            </Fade>
             
             {/* Object settings section */}
+            <Fade in={!isAnalyzing && objectSettings.length > 0} timeout={800} style={{ transitionDelay: '400ms' }}>
+                <Box>
                     {isAnalyzing ? (
-            <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
-                <CircularProgress size={24} sx={{ mr: 2 }} />
-                <Typography variant="body1" component="span">
-                    Detecting objects in 3D model...
-                </Typography>
-            </Paper>
-        ) : objectSettings.length > 0 && (
-            <MultiObjectSettings 
-                objects={objectSettings}
-                onObjectsChange={setObjectSettings}
-                materials={materials}
-                colors={colors}
-                setColors={setColors} // This line is crucial
-            />
-        )}
+                        <Paper 
+                            elevation={3} 
+                            sx={{ 
+                                p: 4, 
+                                textAlign: 'center',
+                                borderRadius: 0,
+                                border: '1px solid rgb(222, 222, 222)',
+                                background: '#111111',
+                                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.5)'
+                            }}
+                        >
+                            <CircularProgress size={24} sx={{ mr: 2, color: 'white' }} />
+                            <Typography variant="body1" component="span" color="#aaaaaa">
+                                Detecting objects in 3D model...
+                            </Typography>
+                        </Paper>
+                    ) : objectSettings.length > 0 && (
+                        <MultiObjectSettings 
+                            objects={objectSettings}
+                            onObjectsChange={setObjectSettings}
+                            materials={materials}
+                            colors={colors}
+                            setColors={setColors}
+                        
+                        />
+                    )}
+                </Box>
+            </Fade>
             
             {/* Submit button */}
-            <LoadingButton
-                loading={isLoading || isAnalyzing}
-                variant="contained"
-                color="primary"
-                onClick={handleSlicingSubmit}
-                fullWidth
-                disabled={!fileData || isLoading || isAnalyzing || objectSettings.length === 0}
-            >
-                {isLoading ? 'Processing...' : 'Start Slicing'}
-            </LoadingButton>
-        </Stack>
+            <Fade in={true} timeout={800} style={{ transitionDelay: '600ms' }}>
+                <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={onReset}
+                        sx={{
+                            py: 1.5,
+                            border: '2px solid white',
+                            color: 'white',
+                            backgroundColor: 'transparent',
+                            borderRadius: 0,
+                            fontSize: '1rem',
+                            fontWeight: 'bold',
+                            letterSpacing: '0.05em',
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                                backgroundColor: 'white',
+                                color: 'black',
+                                borderColor: 'white',
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)'
+                            }
+                        }}
+                    >
+                        Back
+                    </Button>
+                    
+                    <LoadingButton
+                        loading={isLoading || isAnalyzing}
+                        loadingPosition="start"
+                        startIcon={<SettingsIcon />}
+                        variant="contained"
+                        onClick={handleSlicingSubmit}
+                        fullWidth
+                        disabled={!fileData || isLoading || isAnalyzing || objectSettings.length === 0}
+                        sx={{
+                            py: 1.5,
+                            background: 'transparent',
+                            border: '2px solid white',
+                            color: 'white',
+                            borderRadius: 0,
+                            fontSize: '1.1rem',
+                            fontWeight: 'bold',
+                            letterSpacing: '0.05em',
+                            transition: 'all 0.3s ease',
+                            boxShadow: 'none',
+                            '&:hover': {
+                                backgroundColor: 'white',
+                                color: 'black',
+                                borderColor: 'white',
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)'
+                            },
+                            '&:disabled': {
+                                backgroundColor: 'transparent',
+                                borderColor: '#333333',
+                                color: '#333333'
+                            },
+                            '& .MuiLoadingButton-loadingIndicator': {
+                                color: 'white'
+                            }
+                        }}
+                    >
+                        {isLoading ? 'Processing...' : 'Start Slicing'}
+                    </LoadingButton>
+                </Box>
+            </Fade>
+        </Box>
     );
 };
 

@@ -183,7 +183,7 @@ const ObjectPreview = ({ previewUrl, color }) => {
                 sx={{ 
                     height: 150,
                     width: '100%',
-                    border: '1px solid #eee',
+                    border: '1px solid white',
                     borderRadius: 1,
                     overflow: 'hidden',
                 }}
@@ -199,6 +199,7 @@ const ObjectPreview = ({ previewUrl, color }) => {
                     alignItems: 'center', 
                     justifyContent: 'center',
                     backgroundColor: 'rgba(255,255,255,0.7)'
+                    
                 }}>
                     <CircularProgress size={24} />
                 </Box>
