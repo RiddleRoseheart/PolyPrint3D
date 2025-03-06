@@ -6,6 +6,9 @@ from backend.utils import ResponseBuilder
 import logging
 from typing import Dict, Tuple
 import os
+from backend.database.models import PrintRequest, UploadedFile
+import uuid
+from backend.database import db
 from backend.slicer.config.material_config import MaterialConfig
 from backend.database.models import Printer
 

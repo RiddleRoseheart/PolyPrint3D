@@ -8,7 +8,8 @@ from flask import current_app
 from backend.utils import PathUtil
 from backend.slicer.scripts.file_manager import FileManager
 from backend.database.config import db
-from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User, Filament, Material, Color
+from backend.services.printer import PrinterService
+from backend.database.models import PrintRequest, GCodeFile, UploadedFile, User, Filament, Material, Color, Printer
 from backend.slicer.scripts.slicer import split_and_distribute_objects, slice_with_prusa_slicer
 from backend.slicer.config.material_config import AVAILABLE_MATERIALS, AVAILABLE_COLORS
 from backend.services.notification_service import NotificationService
@@ -421,8 +422,7 @@ class SlicerService:
                     )
                 
         except Exception as e:
-            logger.error(f"Error checking project completion: {str(e)}")
-            
+            logger.error(f"Error checking project completion: {str(e)}")            
             
             
     #todo printserservice
