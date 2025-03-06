@@ -23,6 +23,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
 import SelectAllIcon from '@mui/icons-material/SelectAll';
 import axiosInstance from '../api/axiosConfig';
+import { sendToPrinter } from '../api/endpoints/printerEndpoints'; 
 
 const PreviewContainer = ({ children, isLoading }) => (
     <Box sx={{ position: 'relative', height: '100%', width: '100%' }}>
@@ -67,9 +68,19 @@ const isWebGLAvailable = () => {
     }
 };
 
-const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMode = false }) => {
-    // State management
-    const [selectedRequests, setSelectedRequests] = useState(new Set());
+  
+/**
+ * Main component for previewing sliced 3D files
+ * @param {Object} props
+ * @param {Object} props.slicingResult - Result data from slicing operation
+ * @param {Function} props.onReset - Callback for resetting the view
+ * @param {Function} props.onPrintStart - Callback for starting the print
+ * @param {boolean} props.isOfflineMode - Whether the app is in offline mode
+ * @returns {JSX.Element} Sliced files preview component
+ */
+const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart }) => {
+    const [selectedSlices, setSelectedSlices] = useState(new Set());
+
     const [activePreview, setActivePreview] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -95,8 +106,42 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
     const resizeHandlerRef = useRef(null);
     const throttleTimerRef = useRef(null);
 
-    // Calculate total price of selected items
-    const calculateSelectedPrice = useCallback(() => {
+
+    /**
+ * Send selected print jobs to printers
+ */
+const handlePrintStart = async (selectedRequestIds) => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+        // Process each selected request one by one
+        for (const requestId of selectedRequestIds) {
+            // Send the print request to printer
+            const result = await sendToPrinter(requestId);
+            
+            // Add a notification or success message if needed
+            console.log(`Print request ${requestId} sent to printer successfully`, result);
+        }
+        
+        // Call the parent component callback to move to the next step
+        onPrintStart(selectedRequestIds);
+        
+    } catch (error) {
+        console.error('Error sending print job to printer:', error);
+        setError(error.message || 'Failed to send print job to printer');
+    } finally {
+        setIsLoading(false);
+    }
+};
+
+
+    /**
+     * Calculate total price of selected items
+     * @returns {number} Total price of selected items
+     */
+    const calculateSelectedPrice = () => {
+
         if (!slicingResult?.print_requests) return 0;
         
         return slicingResult.print_requests
@@ -1128,7 +1173,7 @@ const SlicedFilesPreview = ({ slicingResult, onReset, onPrintStart, isOfflineMod
                             loadingPosition="start"
                             startIcon={<PrintIcon />}
                             variant="contained"
-                            onClick={() => onPrintStart(Array.from(selectedRequests))}
+                            onClick={() => handlePrintStart(Array.from(selectedRequests))}
                             disabled={selectedRequests.size === 0 || isLoading}
                             sx={{
                                 backgroundColor: 'transparent',

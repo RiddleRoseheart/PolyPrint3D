@@ -22,6 +22,7 @@ import Landing from './components/Landing';
 import AuthPage from './components/authPage';
 import Navbar from './components/Navbar';
 import UserProfile from './components/UserProfile';
+import PrinterAdmin from './components/Admin/PrinterAdmin';
 import AdminInfo from './components/AdminInfo';
 import StarsBackground from './components/StarsBackground'; // Import the new component
 import { getCurrentUser } from './api/endpoints/authEndpoints';
@@ -233,6 +234,7 @@ const theme = createTheme({
   },
 });
 
+
 const STEPS = [
   'Upload STL File',
   'Configure Print Settings',
@@ -399,6 +401,7 @@ function App() {
     };
 
     return (
+
         <ThemeProvider theme={theme}>
             <CssBaseline />
             {/* Add stars background to the entire app */}
@@ -459,6 +462,7 @@ function App() {
                                         position: 'relative',
                                         zIndex: 1
                                     }}
+
                                 >
                                     <Box sx={{ mb: 4, textAlign: 'center' }}>
                                         <Typography 
