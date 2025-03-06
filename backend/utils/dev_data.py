@@ -35,7 +35,6 @@ def create_test_data():
             auth_type='local',
             role=UserRole.ADMIN.value
         )
-
         
         # Create test regular users
         user1 = User(
@@ -47,7 +46,7 @@ def create_test_data():
             auth_type='local',
             role=UserRole.USER.value
         )
-
+        
         user2 = User(
             id=str(uuid.uuid4()),
             email='user2@polyprint.test',
@@ -65,35 +64,59 @@ def create_test_data():
         # TODO fakee
         
         # Create test printers (for admin)
-        test_printer1 = Printer(
+        test_printer7 = Printer(
             id=str(uuid.uuid4()),
-            name='Test Printer 1',
-            ip_address='192.168.1.101',
-            api_key='ABCDEF123456',
-            status='offline',
-            is_available=True,
-            created_at=datetime.utcnow(),
-            material='PLA',  
-            color='Red',
-            build_volume='250,210,210'      
-        )
-
-        test_printer2 = Printer(
-            id=str(uuid.uuid4()),
-            name='Test Printer 2',
-            ip_address='192.168.1.102',
-            api_key='ABCDEF654321',
+            name='Printer 7',
+            ip_address='192.168.1.7', 
+            api_key='N9BjnWFdBOGCAhNlF9EmepEJ6PAklXDye0pEhRUBYxs',  
             status='online',
             is_available=True,
             created_at=datetime.utcnow(),
-            material='ABS',  
+            material='PLA',  
+            color='White',
+            build_volume='250,210,210'      
+        )
+        
+        test_printer8 = Printer(
+            id=str(uuid.uuid4()),
+            name='Printer 8',
+            ip_address='192.168.1.8',  
+            api_key='XXTbEpJhyc7DglBQcxzodvch3YbmeJl9Uv6R6PHhgfY',  
+            is_available=True,
+            created_at=datetime.utcnow(),
+            material='PLA',  
             color='Blue',
             build_volume='250,210,210' 
         )
-       
-        db.session.add_all([test_printer1, test_printer2])
+        
+        test_printer9 = Printer(
+            id=str(uuid.uuid4()),
+            name='Printer 9',
+            ip_address='192.168.1.9',  
+            api_key='0sEcfqbyAUqaBX-LySJAHY7xANs-_ge1_L7JnpdWz4Y',  
+            is_available=True,
+            created_at=datetime.utcnow(),
+            material='PLA',  
+            color='Clear',
+            build_volume='250,210,210' 
+        )
+        
+        test_printer10 = Printer(
+            id=str(uuid.uuid4()),
+            name='Printer 10',
+            ip_address='192.168.1.10',  
+            api_key='LwkjwuybUCIRZIbdaaQ3UGRykEAyOP6nGkp6MJphzX4',  
+            status='online',
+            is_available=True,
+            created_at=datetime.utcnow(),
+            material='PLA',  
+            color='White',
+            build_volume='250,210,210' 
+        )
+        
+        db.session.add_all([test_printer7, test_printer8, test_printer9, test_printer10])
         db.session.commit()
-      
+        
         # Create Materials
         pla = Material(
             id=str(uuid.uuid4()),
@@ -132,7 +155,7 @@ def create_test_data():
             name="Red",
             hex_code="#FF0000"
         )
-
+        
         blue = Color(
             id=str(uuid.uuid4()),
             name="Blue",
@@ -157,7 +180,13 @@ def create_test_data():
             hex_code="#00FF00"
         )
         
-        db.session.add_all([red, blue, black, white, green])
+        clear = Color(  
+            id=str(uuid.uuid4()),
+            name="Clear",
+            hex_code="#FFFFFF"
+        )
+        
+        db.session.add_all([red, blue, black, white, green, clear])
         db.session.commit()
         
         # For user1
@@ -184,7 +213,7 @@ def create_test_data():
             state="completed",
             created_at=datetime.utcnow() - timedelta(days=1),
             user_id=user1.id,
-            printer_id=test_printer1.id,
+            printer_id=test_printer7.id,
             weight=50.0,
             price=1.50
         )
@@ -192,25 +221,56 @@ def create_test_data():
         db.session.add(print_request1)
         db.session.commit()
         
-        # Printer 1 has PLA in Red, White, Black and PETG in Blue
+        # Update filaments to match your new printer variables
         filaments = [
-            # Printer 1 filaments
-            Filament(
-                id=str(uuid.uuid4()),
-                name="Red PLA",
-                price_per_gram=0.25,
-                color_id=red.id,
-                material_id=pla.id,
-                printer_id=test_printer1.id,
-                print_request_id=print_request1.id
-            ),
+            # Printer 7 filaments (192.168.1.7)
             Filament(
                 id=str(uuid.uuid4()),
                 name="White PLA",
                 price_per_gram=0.25,
                 color_id=white.id,
                 material_id=pla.id,
-                printer_id=test_printer1.id,
+                printer_id=test_printer7.id,
+                print_request_id=print_request1.id
+            ),
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Red PLA",
+                price_per_gram=0.25,
+                color_id=red.id,
+                material_id=pla.id,
+                printer_id=test_printer7.id,
+                print_request_id=print_request1.id
+            ),
+            
+            # Printer 8 filaments (192.168.1.8)
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Blue PLA",
+                price_per_gram=0.25,
+                color_id=blue.id,
+                material_id=pla.id,
+                printer_id=test_printer8.id,
+                print_request_id=print_request1.id
+            ),
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Green PLA",
+                price_per_gram=0.25,
+                color_id=green.id,
+                material_id=pla.id,
+                printer_id=test_printer8.id,
+                print_request_id=print_request1.id
+            ),
+            
+            # Printer 9 filaments (192.168.1.9)
+            Filament(
+                id=str(uuid.uuid4()),
+                name="Clear PLA",
+                price_per_gram=0.25,
+                color_id=clear.id,
+                material_id=pla.id,
+                printer_id=test_printer9.id,
                 print_request_id=print_request1.id
             ),
             Filament(
@@ -219,45 +279,27 @@ def create_test_data():
                 price_per_gram=0.25,
                 color_id=black.id,
                 material_id=pla.id,
-                printer_id=test_printer1.id,
-                print_request_id=print_request1.id
-            ),
-            Filament(
-                id=str(uuid.uuid4()),
-                name="Blue PETG",
-                price_per_gram=0.28,
-                color_id=blue.id,
-                material_id=petg.id,
-                printer_id=test_printer1.id,
+                printer_id=test_printer9.id,
                 print_request_id=print_request1.id
             ),
             
-            # Printer 2 filaments - has ABS in Blue, Green and PETG in Red
+            # Printer 10 filaments (192.168.1.10)
             Filament(
                 id=str(uuid.uuid4()),
-                name="Blue ABS",
-                price_per_gram=0.30,
-                color_id=blue.id,
-                material_id=abs_material.id,
-                printer_id=test_printer2.id,
+                name="White PLA",
+                price_per_gram=0.25,
+                color_id=white.id,
+                material_id=pla.id,
+                printer_id=test_printer10.id,
                 print_request_id=print_request1.id
             ),
             Filament(
                 id=str(uuid.uuid4()),
-                name="Green ABS",
-                price_per_gram=0.30,
-                color_id=green.id,
-                material_id=abs_material.id,
-                printer_id=test_printer2.id,
-                print_request_id=print_request1.id
-            ),
-            Filament(
-                id=str(uuid.uuid4()),
-                name="Red PETG",
-                price_per_gram=0.28,
+                name="Red PLA",
+                price_per_gram=0.25,
                 color_id=red.id,
-                material_id=petg.id,
-                printer_id=test_printer2.id,
+                material_id=pla.id,
+                printer_id=test_printer10.id,
                 print_request_id=print_request1.id
             )
         ]
@@ -294,7 +336,7 @@ def create_test_data():
         logger.info("Admin user: admin@polyprint.test / Admin123!")
         logger.info("Regular user 1: user1@polyprint.test / User123!")
         logger.info("Regular user 2: user2@polyprint.test / User123!")
-
+        
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to create test data: {str(e)}")

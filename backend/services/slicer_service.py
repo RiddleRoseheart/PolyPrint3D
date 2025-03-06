@@ -14,6 +14,8 @@ from backend.slicer.scripts.slicer import split_and_distribute_objects, slice_wi
 from backend.slicer.config.material_config import AVAILABLE_MATERIALS, AVAILABLE_COLORS
 from backend.services.notification_service import NotificationService
 from backend.services.octoprint_service import OctoPrintService
+from backend.database.models import Printer
+
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +135,20 @@ class SlicerService:
             )
             print_request.filaments.append(filament)
             
+            # Make sure printer_id is properly set
+            if 'printer' in file_info and hasattr(file_info['printer'], 'printer_id'):
+                print_request.printer_id = file_info['printer'].printer_id
+            elif 'printer_id' in file_info:
+                print_request.printer_id = file_info['printer_id']
+            else:
+                # Fallback to a default printer for now
+                default_printer = Printer.query.filter_by(is_available=True).first()
+                if default_printer:
+                    print_request.printer_id = default_printer.id
+                    self.logger.info(f"Assigned default printer {default_printer.name} to print request")
+                else:
+                    self.logger.warning("No available printer found for print request")
+            
             db.session.add(print_request)
             db.session.flush()
             
@@ -169,6 +185,21 @@ class SlicerService:
         Returns:
             Created PrintRequest object
         """
+        # Extract printer ID from file_info
+        printer_id = None
+        
+        # Debug log to see what we're getting
+        self.logger.info(f"Creating print request with file_info: {file_info}")
+        
+        if 'printer' in file_info:
+            printer = file_info['printer']
+            if hasattr(printer, 'id'):
+                printer_id = printer.id
+            elif isinstance(printer, dict) and 'id' in printer:
+                printer_id = printer['id']
+        
+        self.logger.info(f"Extracted printer_id: {printer_id}")
+        
         return PrintRequest(
             id=str(uuid.uuid4()),
             file_path=file_info['path'],
@@ -177,7 +208,7 @@ class SlicerService:
             state="processing",
             filling=global_settings.get('infill', 20),
             layer_height=global_settings.get('layer_height', 0.2),
-            printer_id=file_info['printer'].printer_id if hasattr(file_info['printer'], 'printer_id') else None,
+            printer_id=printer_id,
             price=file_info.get('price', 0.0),
             weight=file_info.get('weight', 0.0)
         )
@@ -413,52 +444,90 @@ class SlicerService:
                 self.logger.error(f"Print request {request_id} not found or access denied")
                 return False
                 
-            # HARDCODED VALUES FOR TESTING
-            # Instead of checking for a printer in the database
-            printer_ip = "192.168.1.7"  # Hardcoded IP address
-            api_key = "N9BjnWFdBOGCAhNlF9EmepEJ6PAklXDye0pEhRUBYxs"    # Hardcoded API key 
+            # Check if printer is assigned
+            if not print_request.printer_id:
+                self.logger.error(f"No printer assigned to print request {request_id}")
+                return False
+                
+            printer = Printer.query.get(print_request.printer_id)
+            if not printer:
+                self.logger.error(f"Printer {print_request.printer_id} not found")
+                return False
             
-            self.logger.info(f"Using hardcoded printer at {printer_ip} for testing")
+            self.logger.info(f"Using printer {printer.name} at {printer.ip_address}")
             
             # Get G-code file path
             gcode_path = self.get_gcode_file_path(request_id)
             if not gcode_path:
                 self.logger.error(f"G-code file not found for print request {request_id}")
                 return False
+            
+            self.logger.info(f"Found G-code file at {gcode_path}")
                 
-            # Upload G-code file to printer using hardcoded values
+            # Upload G-code file to printer
             try:
-                # Prepare upload request
-                url = f"http://{printer_ip}/api/files/local"
-                
-                files = {
-                    'file': (gcode_path.name, open(gcode_path, 'rb'), 'application/octet-stream')
-                }
-                
-                data = {
-                    'select': 'true',
-                    'print': 'true'  # Set to true to start printing immediately
-                }
-                
-                headers = {
-                    'X-Api-Key': api_key
-                }
-                
-                # Send the request
                 import requests
-                response = requests.post(url, files=files, data=data, headers=headers)
                 
-                if response.status_code in (200, 201):
-                    self.logger.info(f"Successfully sent print job {request_id} to printer at {printer_ip}")
-                    
-                    # Update print request status
-                    print_request.state = "printing"
-                    db.session.commit()
-                    
-                    return True
-                else:
-                    self.logger.error(f"Failed to upload G-code: {response.status_code} - {response.text}")
+                # First check if the OctoPrint server is responsive
+                ping_url = f"http://{printer.ip_address}/api/version"
+                ping_headers = {
+                    'X-Api-Key': printer.api_key
+                }
+                
+                self.logger.info(f"Checking connection to OctoPrint at {printer.ip_address}")
+                ping_response = requests.get(ping_url, headers=ping_headers, timeout=10)
+                
+                if ping_response.status_code != 200:
+                    self.logger.error(f"OctoPrint server not responding correctly: {ping_response.status_code}")
                     return False
+                
+                self.logger.info(f"OctoPrint connection verified successfully")
+                
+                # Prepare upload request
+                url = f"http://{printer.ip_address}/api/files/local"
+                
+                # Make sure the file exists and we can open it
+                if not os.path.exists(gcode_path):
+                    self.logger.error(f"G-code file not found at path: {gcode_path}")
+                    return False
+                
+                # Get the file size to log it
+                file_size = os.path.getsize(gcode_path)
+                self.logger.info(f"Uploading G-code file of size: {file_size} bytes")
+                
+                # Open the file for upload
+                with open(gcode_path, 'rb') as f:
+                    files = {
+                        'file': (os.path.basename(gcode_path), f, 'application/octet-stream')
+                    }
+                    
+                    data = {
+                        'select': 'true',
+                        'print': 'true'  # Set to true to start printing immediately
+                    }
+                    
+                    headers = {
+                        'X-Api-Key': printer.api_key
+                    }
+                    
+                    # Send the request with a timeout
+                    self.logger.info(f"Sending file upload request to {url}")
+                    response = requests.post(url, files=files, data=data, headers=headers, timeout=30)
+                    
+                    self.logger.info(f"Upload response status: {response.status_code}")
+                    self.logger.info(f"Upload response body: {response.text}")
+                    
+                    if response.status_code in (200, 201):
+                        self.logger.info(f"Successfully sent print job {request_id} to printer {printer.name}")
+                        
+                        # Update print request status
+                        print_request.state = "printing"
+                        db.session.commit()
+                        
+                        return True
+                    else:
+                        self.logger.error(f"Failed to upload G-code: {response.status_code} - {response.text}")
+                        return False
                     
             except Exception as e:
                 self.logger.error(f"Error uploading to OctoPrint: {str(e)}")
