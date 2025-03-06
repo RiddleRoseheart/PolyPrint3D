@@ -15,13 +15,15 @@ import {
     CardActions,
     CircularProgress,
     Tooltip,
-    Divider
+    Divider,
+    Chip
 } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import PrintIcon from '@mui/icons-material/Print';
 import DownloadIcon from '@mui/icons-material/Download';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
 import SelectAllIcon from '@mui/icons-material/SelectAll';
+import PriceCheckIcon from '@mui/icons-material/PriceCheck';
 import axiosInstance from '../api/axiosConfig';
 import { sendToPrinter } from '../api/endpoints/printerEndpoints'; 
 
@@ -80,13 +82,14 @@ const isWebGLAvailable = () => {
  */
 const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart }) => {
     const [selectedSlices, setSelectedSlices] = useState(new Set());
-
+    const [selectedRequests, setSelectedRequests] = useState(new Set());
     const [activePreview, setActivePreview] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [isDownloading, setIsDownloading] = useState(false);
     const [webGLAvailable, setWebGLAvailable] = useState(true);
     const [rendererReady, setRendererReady] = useState(false);
+    const [sceneInitialized, setSceneInitialized] = useState(false);
     const [previewRequestStatus, setPreviewRequestStatus] = useState({
         pending: false,
         success: false,
@@ -147,15 +150,15 @@ const handlePrintStart = async (selectedRequestIds) => {
         return slicingResult.print_requests
             .filter(request => selectedRequests.has(request.id))
             .reduce((sum, request) => sum + (parseFloat(request.price) || 0), 0);
-    }, [slicingResult, selectedRequests]);
+    };
 
     // Get total project price
-    const getTotalPrice = useCallback(() => {
+    const getTotalPrice = () => {
         if (!slicingResult?.print_requests) return 0;
         
         return slicingResult.print_requests.reduce((sum, request) => 
             sum + (parseFloat(request.price) || 0), 0);
-    }, [slicingResult]);
+    };
 
     // Safe method to clear container contents
     const clearContainer = useCallback(() => {
