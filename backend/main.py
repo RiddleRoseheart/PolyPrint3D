@@ -96,6 +96,8 @@ def create_app():
     # Configure app
     app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
+    
+    app.config['OCTOPRINT_TIMEOUT'] = 10
    
 # Configure Flask-Mail TODO .ENV!! & in production
     app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
@@ -124,7 +126,7 @@ def create_app():
     app.register_blueprint(slicer_routes.bp)
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(printer_bp)
-    app.register_blueprint(octoprint_bp)
+    #app.register_blueprint(octoprint_routes.bp)
 
     @app.route('/')
     def serve():

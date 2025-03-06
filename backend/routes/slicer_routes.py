@@ -241,3 +241,28 @@ def download_gcode(request_id: str):
     except Exception as e:
         logger.error(f"Error downloading G-code: {str(e)}")
         return ResponseBuilder.error(str(e), 500)
+    
+#TODO sevice
+@bp.route('/api/slicer/requests/<request_id>/print', methods=['POST'])
+@login_required
+def send_to_printer(request_id: str):
+    """
+    Send a print request to a printer
+    
+    Args:
+        request_id: ID of print request to send
+        
+    Returns:
+        JSON response indicating success or failure
+    """
+    try:
+        success = slicer_service.send_to_printer(request_id, current_user)
+        
+        if success:
+            return ResponseBuilder.success(message="Print job sent to printer successfully")
+        else:
+            return ResponseBuilder.error("Failed to send print job to printer", 400)
+            
+    except Exception as e:
+        logger.error(f"Error sending print job to printer: {str(e)}")
+        return ResponseBuilder.error(f"Error sending print job to printer: {str(e)}", 500)
