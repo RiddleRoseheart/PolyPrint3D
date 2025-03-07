@@ -4,6 +4,7 @@ import os
 from typing import Dict, Optional
 from pathlib import Path
 from backend.database.models import Printer, PrintRequest
+from backend.services.alert_service import AlertService, AlertType
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ class OctoPrintService:
     def __init__(self):
         """Initialize OctoPrint service"""
         self.logger = logging.getLogger(__name__)
+        self.alert_service = AlertService()
         
     def _get_headers(self, api_key: str) -> Dict:
         """Create HTTP headers for OctoPrint API requests"""
@@ -194,4 +196,68 @@ class OctoPrintService:
                 
         except Exception as e:
             self.logger.error(f"Error getting job status: {str(e)}")
-            return {"status": "error", "message": str(e)}
+            return {"status": "error", "message": str(e)}  
+        
+    def pause_print_job(self, printer: Printer) -> bool:
+        """
+        Pause the current print job
+        
+        Args:
+            printer: Printer model object
+            
+        Returns:
+            bool indicating success
+        """
+        try:
+            url = f"http://{printer.ip_address}/api/job"
+            headers = self._get_headers(printer.api_key)
+            
+            data = {
+                "command": "pause",
+                "action": "pause"
+            }
+            
+            response = requests.post(url, headers=headers, json=data)
+            
+            if response.status_code in (200, 204):
+                self.logger.info(f"Successfully paused print job on printer {printer.name}")
+                return True
+            else:
+                self.logger.error(f"Failed to pause print job: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error pausing print job: {str(e)}")
+            return False
+
+def resume_print_job(self, printer: Printer) -> bool:
+    """
+    Resume the paused print job
+    
+    Args:
+        printer: Printer model object
+        
+    Returns:
+        bool indicating success
+    """
+    try:
+        url = f"http://{printer.ip_address}/api/job"
+        headers = self._get_headers(printer.api_key)
+        
+        data = {
+            "command": "pause",
+            "action": "resume"
+        }
+        
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code in (200, 204):
+            self.logger.info(f"Successfully resumed print job on printer {printer.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to resume print job: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        self.logger.error(f"Error resuming print job: {str(e)}")
+        return False

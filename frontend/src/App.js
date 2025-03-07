@@ -9,9 +9,8 @@ import Landing from './components/Landing';
 import AuthPage from './components/authPage';
 import Navbar from './components/Navbar';
 import UserProfile from './components/UserProfile';
-import AdminInfo from './components/AdminInfo'; // Import the AdminInfo component
-import { getCurrentUser } from './api/endpoints/authEndpoints'; // Make sure the path matches your actual file structure
-
+import { getCurrentUser } from './api/endpoints/authEndpoints'; 
+import PrinterAdmin from './components/Admin/PrinterAdmin';
 const STEPS = [
   'Upload STL File',
   'Configure Print Settings',
@@ -183,7 +182,7 @@ function App() {
                     path="/admin" 
                     element={
                         <ProtectedAdminRoute>
-                            <AdminInfo />
+                            <PrinterAdmin />
                         </ProtectedAdminRoute>
                     } 
                 />

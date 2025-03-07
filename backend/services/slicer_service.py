@@ -438,20 +438,44 @@ class SlicerService:
             bool indicating success
         """
         try:
+            # Initialize AlertService
+            from backend.services.alert_service import AlertService, AlertType
+            alert_service = AlertService()
+            
             # Verify print request and access
             print_request = self.get_print_request(request_id, user)
             if not print_request:
                 self.logger.error(f"Print request {request_id} not found or access denied")
+                alert_service.create_alert(
+                    title="Print Request Error",
+                    message=f"Print request not found or access denied",
+                    alert_type=AlertType.ERROR,
+                    user_id=user.id
+                )
                 return False
                 
             # Check if printer is assigned
             if not print_request.printer_id:
                 self.logger.error(f"No printer assigned to print request {request_id}")
+                alert_service.create_alert(
+                    title="Print Error",
+                    message=f"No printer assigned to this print request",
+                    alert_type=AlertType.ERROR,
+                    user_id=user.id,
+                    source="System"
+                )
                 return False
                 
             printer = Printer.query.get(print_request.printer_id)
             if not printer:
                 self.logger.error(f"Printer {print_request.printer_id} not found")
+                alert_service.create_alert(
+                    title="Printer Error",
+                    message=f"The assigned printer was not found",
+                    alert_type=AlertType.ERROR,
+                    user_id=user.id,
+                    source="System"
+                )
                 return False
             
             self.logger.info(f"Using printer {printer.name} at {printer.ip_address}")
@@ -460,6 +484,13 @@ class SlicerService:
             gcode_path = self.get_gcode_file_path(request_id)
             if not gcode_path:
                 self.logger.error(f"G-code file not found for print request {request_id}")
+                alert_service.create_alert(
+                    title="File Error",
+                    message=f"G-code file not found for this print request",
+                    alert_type=AlertType.ERROR,
+                    user_id=user.id,
+                    source="System"
+                )
                 return False
             
             self.logger.info(f"Found G-code file at {gcode_path}")
@@ -479,6 +510,14 @@ class SlicerService:
                 
                 if ping_response.status_code != 200:
                     self.logger.error(f"OctoPrint server not responding correctly: {ping_response.status_code}")
+                    alert_service.create_alert(
+                        title="Printer Connection Error",
+                        message=f"Printer {printer.name} is not responding correctly",
+                        alert_type=AlertType.ERROR,
+                        user_id=user.id,
+                        source="Printer",
+                        source_id=printer.id
+                    )
                     return False
                 
                 self.logger.info(f"OctoPrint connection verified successfully")
@@ -489,11 +528,21 @@ class SlicerService:
                 # Make sure the file exists and we can open it
                 if not os.path.exists(gcode_path):
                     self.logger.error(f"G-code file not found at path: {gcode_path}")
+                    alert_service.create_alert(
+                        title="File Access Error",
+                        message=f"G-code file could not be accessed",
+                        alert_type=AlertType.ERROR,
+                        user_id=user.id,
+                        source="System"
+                    )
                     return False
                 
                 # Get the file size to log it
                 file_size = os.path.getsize(gcode_path)
                 self.logger.info(f"Uploading G-code file of size: {file_size} bytes")
+                
+                # Extract file name for alert
+                file_name = os.path.basename(gcode_path)
                 
                 # Open the file for upload
                 with open(gcode_path, 'rb') as f:
@@ -524,16 +573,58 @@ class SlicerService:
                         print_request.state = "printing"
                         db.session.commit()
                         
+                        # Create success alert
+                        alert_service.create_alert(
+                            title=f"Print Started: {file_name}",
+                            message=f"Print job successfully started on printer {printer.name}",
+                            alert_type=AlertType.SUCCESS,
+                            user_id=user.id,
+                            source="Printer",
+                            source_id=printer.id
+                        )
+                        
                         return True
                     else:
                         self.logger.error(f"Failed to upload G-code: {response.status_code} - {response.text}")
+                        alert_service.create_alert(
+                            title="Print Upload Failed",
+                            message=f"Failed to upload G-code file to printer {printer.name}. Error: {response.status_code}",
+                            alert_type=AlertType.ERROR,
+                            user_id=user.id,
+                            source="Printer",
+                            source_id=printer.id
+                        )
                         return False
                     
             except Exception as e:
                 self.logger.error(f"Error uploading to OctoPrint: {str(e)}")
+                alert_service.create_alert(
+                    title="Print Communication Error",
+                    message=f"Error communicating with printer {printer.name}: {str(e)}",
+                    alert_type=AlertType.ERROR,
+                    user_id=user.id,
+                    source="Printer",
+                    source_id=printer.id
+                )
                 return False
             
         except Exception as e:
             db.session.rollback()
             self.logger.error(f"Error sending print request to printer: {str(e)}")
+            
+            try:
+                # Try to create an alert for the general error
+                from backend.services.alert_service import AlertService, AlertType
+                alert_service = AlertService()
+                alert_service.create_alert(
+                    title="Print Request Failed",
+                    message=f"Error processing print request: {str(e)}",
+                    alert_type=AlertType.ERROR,
+                    user_id=user.id,
+                    source="System"
+                )
+            except:
+                # If alert creation itself fails, just log it
+                self.logger.error("Failed to create error alert")
+                
             return False

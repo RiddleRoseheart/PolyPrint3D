@@ -1,7 +1,6 @@
 from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
-from backend.routes import file_routes, slicer_routes, auth_routes
-from backend.routes.printer import bp as printer_bp
+from backend.routes import file_routes, slicer_routes, auth_routes, printer_routes, alert_routes
 from pathlib import Path
 
 import os
@@ -13,6 +12,7 @@ from backend.utils.dev_data import create_test_data
 from backend.database.models import User
 from backend.routes.octoprint_routes import bp as octoprint_bp
 from dotenv import load_dotenv
+
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -107,8 +107,8 @@ def create_app():
     app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', 'c3d5822dd84d40')
     mail.init_app(app)
 
-    app.config['FILE_MANAGER_USERNAME'] = 'local_user'  # Or get from environment
-    app.config['FILE_MANAGER_PASSWORD'] = 'password'    # Or get from environment
+    app.config['FILE_MANAGER_USERNAME'] = 'local_user'  
+    app.config['FILE_MANAGER_PASSWORD'] = 'password'    
     app.config['FILE_MANAGER_REMOTE_PATH'] = '/remote'
 
     # Handle database reset
@@ -125,8 +125,9 @@ def create_app():
     app.register_blueprint(file_routes.bp)
     app.register_blueprint(slicer_routes.bp)
     app.register_blueprint(auth_routes.bp)
-    app.register_blueprint(printer_bp)
+    app.register_blueprint(printer_routes.bp)
     #app.register_blueprint(octoprint_routes.bp)
+    app.register_blueprint(alert_routes.bp)
 
     @app.route('/')
     def serve():
