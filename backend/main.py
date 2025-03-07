@@ -94,23 +94,12 @@ def create_app():
     app.config['FILE_MANAGER_USERNAME'] = 'local_user'  
     app.config['FILE_MANAGER_PASSWORD'] = 'password'    
     app.config['FILE_MANAGER_REMOTE_PATH'] = '/remote'
-
-    # Handle database reset
-    if "--reset-db" in sys.argv:
-        print("Resetting database...")
-        with app.app_context():
-            db.drop_all()
-            db.create_all()
-            create_test_data()
-            check_printer_data(app)
-            print("Database reset complete")
     
     # Register blueprints
     app.register_blueprint(file_routes.bp)
     app.register_blueprint(slicer_routes.bp)
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(printer_routes.bp)
-    #app.register_blueprint(octoprint_routes.bp)
     app.register_blueprint(alert_routes.bp)
 
     @app.route('/')
