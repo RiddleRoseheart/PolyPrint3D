@@ -44,6 +44,52 @@ import {
 } from '../../api/endpoints/adminEndpoints';
 import AlertSection from './AlertSection';
 
+// Define explicit color values that will override any theme settings
+const STATUS_COLORS = {
+  Operational: {
+    main: '#4CAF50', // Green
+    light: '#E8F5E9',
+    dark: '#2E7D32',
+    contrastText: '#FFFFFF'
+  },
+  Printing: {
+    main: '#2196F3', // Blue
+    light: '#E3F2FD',
+    dark: '#1565C0',
+    contrastText: '#FFFFFF'
+  },
+  Paused: {
+    main: '#FF9800', // Orange
+    light: '#FFF3E0',
+    dark: '#EF6C00',
+    contrastText: '#FFFFFF'
+  },
+  Pausing: {
+    main: '#FF9800', // Orange
+    light: '#FFF3E0',
+    dark: '#EF6C00',
+    contrastText: '#FFFFFF'
+  },
+  Error: {
+    main: '#F44336', // Red
+    light: '#FFEBEE',
+    dark: '#C62828',
+    contrastText: '#FFFFFF'
+  },
+  Offline: {
+    main: '#F44336', // Red
+    light: '#FFEBEE',
+    dark: '#C62828',
+    contrastText: '#FFFFFF'
+  },
+  default: {
+    main: '#9E9E9E', // Grey
+    light: '#F5F5F5',
+    dark: '#616161',
+    contrastText: '#FFFFFF'
+  }
+};
+
 const PrinterAdmin = () => {
   const [printers, setPrinters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -191,22 +237,10 @@ const PrinterAdmin = () => {
     }
   };
 
-  // Get status color based on printer status
+  // Get status color based on printer status - UPDATED for direct color values
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'Operational':
-        return 'success';
-      case 'Printing':
-        return 'info';
-      case 'Paused':
-      case 'Pausing':
-        return 'warning';
-      case 'Error':
-      case 'Offline':
-        return 'error';
-      default:
-        return 'default';
-    }
+    // Return the color object for the status, or default if not found
+    return STATUS_COLORS[status] || STATUS_COLORS.default;
   };
 
   // Format the filename to be more readable
@@ -362,7 +396,7 @@ const PrinterAdmin = () => {
       </Stack>
 
       {error && (
-        <Paper sx={{ p: 2, mb: 3, bgcolor: 'error.light', color: 'error.contrastText' }}>
+        <Paper sx={{ p: 2, mb: 3, bgcolor: '#FFEBEE', color: '#C62828' }}>
           <Typography>{error}</Typography>
         </Paper>
       )}
@@ -373,13 +407,16 @@ const PrinterAdmin = () => {
         </Box>
       ) : (
         <Grid container spacing={3}>
-          {printers.map(printer => (
+          {printers.map(printer => {
+            const statusColor = getStatusColor(printer.status);
+            
+            return (
             <Grid item xs={12} md={6} key={printer.id}>
               <Card 
                 variant="outlined" 
                 sx={{ 
                   position: 'relative',
-                  borderColor: printer.status === 'Printing' ? 'info.main' : 'inherit',
+                  borderColor: printer.status === 'Printing' ? STATUS_COLORS.Printing.main : 'inherit',
                   borderWidth: printer.status === 'Printing' ? 2 : 1
                 }}
               >
@@ -392,8 +429,8 @@ const PrinterAdmin = () => {
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Avatar 
                         sx={{ 
-                          bgcolor: getStatusColor(printer.status) + '.light',
-                          color: getStatusColor(printer.status) + '.dark',
+                          bgcolor: statusColor.light,
+                          color: statusColor.dark,
                           width: 32,
                           height: 32
                         }}
@@ -406,7 +443,12 @@ const PrinterAdmin = () => {
                     </Stack>
                     <Chip 
                       label={printer.status || 'Unknown'} 
-                      color={getStatusColor(printer.status)}
+                      sx={{
+                        bgcolor: statusColor.main,
+                        color: statusColor.contrastText,
+                        fontWeight: 'bold',
+                        fontSize: '0.8rem'
+                      }}
                       size="small"
                     />
                   </Stack>
@@ -439,47 +481,54 @@ const PrinterAdmin = () => {
                   </Box>
                   
                   {printer.job_info && printer.job_info.progress && (
-  <Box sx={{ mt: 2 }}>
-    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-      <Typography variant="body2">
-        {Math.round(printer.job_info.progress.completion)}%
-      </Typography>
-      <Typography variant="body2">
-        Est. completion: {getEstimatedCompletion(printer.job_info)}
-      </Typography>
-    </Stack>
-    <LinearProgress 
-      variant="determinate" 
-      value={printer.job_info.progress.completion || 0} 
-      sx={{ height: 8, borderRadius: 1 }}
-    />
-    
-    <Grid container spacing={1} sx={{ mt: 1 }}>
-      <Grid item xs={6}>
-        <Typography variant="caption" color="text.secondary">
-          Time Remaining
-        </Typography>
-        <Typography variant="body2" fontWeight="medium">
-          {formatTimeHoursMinutes(printer.job_info.progress.printTimeLeft)}
-        </Typography>
-      </Grid>
-      <Grid item xs={6}>
-        <Typography variant="caption" color="text.secondary">
-          Elapsed Time
-        </Typography>
-        <Typography variant="body2" fontWeight="medium">
-          {formatTimeHoursMinutes(printer.job_info.progress.printTime)}
-        </Typography>
-      </Grid>
-    </Grid>
-    
-    {getTemperatureInfo(printer.job_info) && (
-      <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-        {getTemperatureInfo(printer.job_info)}
-      </Typography>
-    )}
-  </Box>
-)}
+                    <Box sx={{ mt: 2 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                        <Typography variant="body2">
+                          {Math.round(printer.job_info.progress.completion)}%
+                        </Typography>
+                        <Typography variant="body2">
+                          Est. completion: {getEstimatedCompletion(printer.job_info)}
+                        </Typography>
+                      </Stack>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={printer.job_info.progress.completion || 0} 
+                        sx={{ 
+                          height: 8, 
+                          borderRadius: 1,
+                          "& .MuiLinearProgress-bar": {
+                            bgcolor: printer.status === 'Printing' ? STATUS_COLORS.Printing.main : 
+                                    printer.status === 'Paused' ? STATUS_COLORS.Paused.main : '#1976d2'
+                          }
+                        }}
+                      />
+                      
+                      <Grid container spacing={1} sx={{ mt: 1 }}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Time Remaining
+                          </Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {formatTimeHoursMinutes(printer.job_info.progress.printTimeLeft)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Elapsed Time
+                          </Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {formatTimeHoursMinutes(printer.job_info.progress.printTime)}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                      
+                      {getTemperatureInfo(printer.job_info) && (
+                        <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                          {getTemperatureInfo(printer.job_info)}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
                   
                   {printer.active_print_request && (
                     <Box sx={{ mt: 2 }}>
@@ -542,7 +591,7 @@ const PrinterAdmin = () => {
                     <Tooltip title="Delete Printer">
                       <IconButton 
                         size="small" 
-                        color="error" 
+                        sx={{ color: '#F44336' }}
                         onClick={() => handleDeletePrinter(printer.id)}
                         disabled={printer.status === 'Printing'}
                       >
@@ -556,7 +605,7 @@ const PrinterAdmin = () => {
                       <Tooltip title="Pause Print">
                         <IconButton 
                           size="small" 
-                          color="warning"
+                          sx={{ color: STATUS_COLORS.Paused.main }}
                           onClick={() => handlePausePrint(printer.id, printer.ip_address, printer.api_key)}
                         >
                           <PauseIcon />
@@ -566,7 +615,7 @@ const PrinterAdmin = () => {
                       <Tooltip title="Cancel Print">
                         <IconButton 
                           size="small" 
-                          color="error"
+                          sx={{ color: STATUS_COLORS.Error.main }}
                           onClick={() => handleCancelPrint(printer.id, printer.ip_address, printer.api_key)}
                         >
                           <StopIcon />
@@ -580,7 +629,7 @@ const PrinterAdmin = () => {
                       <Tooltip title="Resume Print">
                         <IconButton 
                           size="small" 
-                          color="info"
+                          sx={{ color: STATUS_COLORS.Printing.main }}
                           onClick={() => handleResumePrint(printer.id, printer.ip_address, printer.api_key)}
                         >
                           <PlayArrowIcon />
@@ -590,7 +639,7 @@ const PrinterAdmin = () => {
                       <Tooltip title="Cancel Print">
                         <IconButton 
                           size="small" 
-                          color="error"
+                          sx={{ color: STATUS_COLORS.Error.main }}
                           onClick={() => handleCancelPrint(printer.id, printer.ip_address, printer.api_key)}
                         >
                           <StopIcon />
@@ -600,10 +649,8 @@ const PrinterAdmin = () => {
                   )}
                 </CardActions>
               </Card>
-
-              
             </Grid>
-          ))}
+          )})}
           
           {printers.length === 0 && !loading && (
             <Grid item xs={12}>
@@ -623,11 +670,11 @@ const PrinterAdmin = () => {
               </Paper>
             </Grid>
           )}
-           {/* Alerts section */}
-  <Grid item xs={12} md={6} lg={4}>
-    <AlertSection />
-  </Grid>
-</Grid>
+          {/* Alerts section */}
+          <Grid item xs={12}>
+            <AlertSection />
+          </Grid>
+        </Grid>
       )}
 
       {/* Add/Edit Printer Dialog */}

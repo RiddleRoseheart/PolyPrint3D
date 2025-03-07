@@ -73,13 +73,13 @@ const PrinterNotifications = () => {
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'success':
-        return <CheckCircleIcon color="success" />;
+        return <CheckCircleIcon sx={{ color: 'success.main' }} />;
       case 'error':
-        return <ErrorIcon color="error" />;
+        return <ErrorIcon sx={{ color: 'error.main' }} />;
       case 'warning':
-        return <WarningIcon color="warning" />;
+        return <WarningIcon sx={{ color: 'warning.main' }} />;
       default:
-        return <InfoIcon color="info" />;
+        return <InfoIcon sx={{ color: 'info.main' }} />;
     }
   };
 
