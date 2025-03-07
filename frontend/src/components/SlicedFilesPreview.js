@@ -26,7 +26,9 @@ import SelectAllIcon from '@mui/icons-material/SelectAll';
 import PriceCheckIcon from '@mui/icons-material/PriceCheck';
 import axiosInstance from '../api/axiosConfig';
 import { sendToPrinter } from '../api/endpoints/printerEndpoints'; 
-
+import { 
+    Info as InfoIcon
+} from '@mui/icons-material';
 /**
  * Loading overlay component for 3D preview
  * @param {Object} props
@@ -90,7 +92,7 @@ const isWebGLAvailable = () => {
  * @param {boolean} props.isOfflineMode - Whether the app is in offline mode
  * @returns {JSX.Element} Sliced files preview component
  */
-const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart }) => {
+const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart, isLocalMode }) => {
     const [selectedSlices, setSelectedSlices] = useState(new Set());
     const [activePreview, setActivePreview] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -644,7 +646,6 @@ const handlePrintStart = async (selectedRequestIds) => {
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
             
-            // Success message could be shown here
         } catch (error) {
             console.error('Download error:', error);
             setError('Failed to download one or more files. Please try again.');
@@ -655,17 +656,38 @@ const handlePrintStart = async (selectedRequestIds) => {
    
     return (
         <Stack spacing={3} sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
+            {/* Local Mode Banner */}
+            {isLocalMode && (
+                <Paper 
+                    elevation={0}
+                    sx={{
+                        backgroundColor: '#fff3cd',
+                        color: '#856404',
+                        p: 2,
+                        mb: 3,
+                        borderRadius: 1,
+                        border: '1px solid #ffeeba',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                >
+                    <Typography variant="body1">
+                        <strong>Network Connection Mode:</strong> You are not on the same network as the printers. You can only download files for manual printing.
+                    </Typography>
+                </Paper>
+            )}
             <Paper elevation={3} sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>
                     Sliced Files Preview
                 </Typography>
-
+    
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
                         {error}
                     </Alert>
                 )}
-
+    
                 <Grid container spacing={2}>
                     <Grid item xs={12} md={8}>
                         <PreviewContainer isLoading={isLoading}>
@@ -743,7 +765,7 @@ const handlePrintStart = async (selectedRequestIds) => {
                                             Material: {request.filaments?.[0]?.material || 'Unknown'}
                                         </Typography> 
                                     </CardContent>
-
+    
                                     <CardActions>
                                         <Button 
                                             size="small" 
@@ -753,12 +775,12 @@ const handlePrintStart = async (selectedRequestIds) => {
                                             {activePreview?.id === request.id ? "Viewing" : "Preview"}
                                         </Button>
                                         <Button
-        size="small"
-        onClick={() => handleDownload(request)}
-        disabled={isLoading}
-    >
-        Download
-    </Button>
+                                            size="small"
+                                            onClick={() => handleDownload(request)}
+                                            disabled={isLoading}
+                                        >
+                                            Download
+                                        </Button>
                                     </CardActions>
                                 </Card>
                             ))}
@@ -770,7 +792,7 @@ const handlePrintStart = async (selectedRequestIds) => {
                         </Stack>
                     </Grid>
                 </Grid>
-
+    
                 {/* Pricing Summary */}
                 <Box sx={{ mt: 3 }}>
                     <Divider sx={{ mb: 2 }} />
@@ -797,7 +819,7 @@ const handlePrintStart = async (selectedRequestIds) => {
                         </Grid>
                     </Grid>
                 </Box>
-
+    
                 <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
                     <Stack direction="row" spacing={2}>
                         <Button
@@ -817,7 +839,8 @@ const handlePrintStart = async (selectedRequestIds) => {
                         </Button>
                     </Stack>
                     
-                    {isOfflineMode ? (
+                    {/* Show download button when in local mode, otherwise show print button */}
+                    {(isLocalMode || isOfflineMode) ? (
                         <LoadingButton
                             loading={isDownloading}
                             loadingPosition="start"
@@ -841,9 +864,24 @@ const handlePrintStart = async (selectedRequestIds) => {
                         </LoadingButton>
                     )}
                 </Box>
+                
+                {/* Additional download options when in local mode */}
+                {isLocalMode && (
+                   <Box sx={{ mt: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                       <InfoIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 1 }} />
+                       You cannot send print jobs directly to printers
+                   </Typography>
+                   <Typography variant="body2" color="text.secondary" gutterBottom>
+                       Your computer is not on the same network as the 3D printers. You can still slice files and download the G-code to a USB drive, then load them manually onto a printer.
+                   </Typography>
+                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                       To enable direct printing, connect your device to the printer network or contact your administrator.
+                   </Typography>
+               </Box>
+                )}
             </Paper>
         </Stack>
     );
 };
-
 export default SlicedFilesPreview;

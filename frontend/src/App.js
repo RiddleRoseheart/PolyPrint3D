@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Box, Container, Typography, Stepper, Step, StepLabel, Alert, CircularProgress } from '@mui/material';
+import { Box, Container, Typography, Stepper, Step, StepLabel, Alert, CircularProgress, Paper } from '@mui/material';
 import PrintSettings from './components/PrintSettings';
 import STLFileUpload from './components/STLFileUpload';
 import SlicedFilesPreview from './components/SlicedFilesPreview';
@@ -11,6 +11,8 @@ import Navbar from './components/Navbar';
 import UserProfile from './components/UserProfile';
 import { getCurrentUser } from './api/endpoints/authEndpoints'; 
 import PrinterAdmin from './components/Admin/PrinterAdmin';
+import { checkLocalMode } from './api/endpoints/configEndpoints';
+
 const STEPS = [
   'Upload STL File',
   'Configure Print Settings',
@@ -20,6 +22,7 @@ const STEPS = [
 
 function App() {
     const [user, setUser] = useState(null);
+    const [isLocalMode, setIsLocalMode] = useState(false);
     const [appState, setAppState] = useState({
         data: null,
         error: null,
@@ -29,20 +32,28 @@ function App() {
         isLoading: true // Start with isLoading true to check auth status
     });
 
-    // Check authentication status on app load
+    // Check authentication status and local mode on app load
     useEffect(() => {
-        const fetchCurrentUser = async () => {
+        const fetchInitialData = async () => {
             try {
+                // Check if in local mode
+                const localModeStatus = await checkLocalMode();
+                setIsLocalMode(localModeStatus.isLocalMode);
+
+                // Get current user
                 const userData = await getCurrentUser();
                 setUser(userData); // Set the user if logged in
             } catch (error) {
+                if (error.message !== "Not authenticated") {
+                    console.error("Error during initialization:", error);
+                }
                 setUser(null); // No user is logged in
             } finally {
                 setAppState(prev => ({ ...prev, isLoading: false })); // Stop loading
             }
         };
 
-        fetchCurrentUser();
+        fetchInitialData();
     }, []);
 
     const getActiveStep = () => {
@@ -93,6 +104,28 @@ function App() {
             error: errorMessage
         }));
     };
+
+    const LocalModeBanner = () => (
+        <Paper 
+            elevation={0}
+            sx={{
+                backgroundColor: '#fff3cd',
+                color: '#856404',
+                p: 2,
+                mb: 3,
+                borderRadius: 1,
+                border: '1px solid #ffeeba',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            }}
+        >
+            <Typography variant="body1">
+                <strong>Network Connection Mode:</strong> You are not on the same network as the printers. 
+                Direct printing is unavailable, but you can download files for manual printing.
+            </Typography>
+        </Paper>
+    );
 
     // Show loading spinner while checking auth status
     if (appState.isLoading) {
@@ -157,6 +190,7 @@ function App() {
                     slicingResult={appState.slicingResult}
                     onPrintStart={handlePrintStart}
                     onReset={handleReset}
+                    isLocalMode={isLocalMode} 
                 />
             );
         }
@@ -223,6 +257,9 @@ function App() {
                                         </Typography>
                                     )}
                                 </Box>
+
+                                 {/* Display local mode banner if active */}
+                                 {isLocalMode && <LocalModeBanner />}
 
                                 <Stepper 
                                     activeStep={getActiveStep()} 

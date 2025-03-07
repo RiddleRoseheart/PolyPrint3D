@@ -1,6 +1,6 @@
 from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
-from backend.routes import file_routes, slicer_routes, auth_routes, printer_routes, alert_routes
+from backend.routes import file_routes, slicer_routes, auth_routes, printer_routes, alert_routes, config_routes
 from pathlib import Path
 import os
 import sys
@@ -94,6 +94,16 @@ def create_app():
     app.config['FILE_MANAGER_USERNAME'] = 'local_user'  
     app.config['FILE_MANAGER_PASSWORD'] = 'password'    
     app.config['FILE_MANAGER_REMOTE_PATH'] = '/remote'
+
+    # Handle database reset
+    if "--reset-db" in sys.argv:
+        print("Resetting database...")
+        with app.app_context():
+            db.drop_all()
+            db.create_all()
+            create_test_data()
+            check_printer_data(app)
+            print("Database reset complete")
     
     # Register blueprints
     app.register_blueprint(file_routes.bp)
@@ -101,6 +111,8 @@ def create_app():
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(printer_routes.bp)
     app.register_blueprint(alert_routes.bp)
+    app.register_blueprint(config_routes.bp)
+    
 
     @app.route('/')
     def serve():
