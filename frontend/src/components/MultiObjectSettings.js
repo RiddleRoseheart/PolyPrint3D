@@ -41,8 +41,8 @@ const ObjectSettingsCard = ({ object, index, materials, colors, onChange, onMate
     };
     
     return (
-        <Card variant="outlined" sx={{ mb: 2 }}>
-            <Grid container spacing={2}>
+        <Card variant="outlined"  sx={{ mb: 2 }} >
+            <Grid container  spacing={2}>
                 <Grid item xs={12} sm={4} md={3}>
                     <Box sx={{ p: 2 }}>
                         <ObjectPreview 
@@ -51,8 +51,8 @@ const ObjectSettingsCard = ({ object, index, materials, colors, onChange, onMate
                         />
                     </Box>
                 </Grid>
-                <Grid item xs={12} sm={8} md={9}>
-                    <CardContent>
+                <Grid item xs={12} sm={8} md={9} >
+                    <CardContent >
                         <Typography variant="h6" gutterBottom>
                             Object {index + 1}
                         </Typography>
@@ -102,7 +102,7 @@ const ObjectSettingsCard = ({ object, index, materials, colors, onChange, onMate
                                             height: 16, 
                                             bgcolor: colors[color],
                                             mr: 1,
-                                            border: '1px solid #ccc',
+                                            border: '1px solid white',
                                             borderRadius: '2px'
                                         }} 
                                         />
@@ -225,13 +225,14 @@ const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors: glob
     };
 
     return (
-        <Paper elevation={3} sx={{ p: 2 }}>
+        <Box border='1px solid rgb(222, 222, 222)'>
+        <Paper  elevation={3} sx={{ p: 2 }}  >
             {/* Apply to all section - no change */}
             <Typography variant="h6" gutterBottom>
                 Object-Specific Settings ({objects.length} objects)
             </Typography>
             
-            <Box sx={{ mb: 2 }}>
+            <Box sx={{ mb: 2 }} >
                 <Typography variant="subtitle2" gutterBottom>
                     Apply to all objects:
                 </Typography>
@@ -308,6 +309,7 @@ const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors: glob
                 </Typography>
             )}
         </Paper>
+        </Box>
     );
 };
 export default MultiObjectSettings;
