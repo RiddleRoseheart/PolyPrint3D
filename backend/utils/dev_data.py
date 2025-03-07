@@ -110,7 +110,7 @@ def create_test_data():
             is_available=True,
             created_at=datetime.utcnow(),
             material='PLA',  
-            color='White',
+            color='Green',
             build_volume='250,210,210' 
         )
         
@@ -233,15 +233,15 @@ def create_test_data():
                 printer_id=test_printer7.id,
                 print_request_id=print_request1.id
             ),
-            Filament(
-                id=str(uuid.uuid4()),
-                name="Red PLA",
-                price_per_gram=0.25,
-                color_id=red.id,
-                material_id=pla.id,
-                printer_id=test_printer7.id,
-                print_request_id=print_request1.id
-            ),
+            # Filament(
+            #     id=str(uuid.uuid4()),
+            #     name="Red PLA",
+            #     price_per_gram=0.25,
+            #     color_id=red.id,
+            #     material_id=pla.id,
+            #     printer_id=test_printer7.id,
+            #     print_request_id=print_request1.id
+            # ),
             
             # Printer 8 filaments (192.168.1.8)
             Filament(
@@ -259,7 +259,7 @@ def create_test_data():
                 price_per_gram=0.25,
                 color_id=green.id,
                 material_id=pla.id,
-                printer_id=test_printer8.id,
+                printer_id=test_printer10.id,
                 print_request_id=print_request1.id
             ),
             
@@ -273,15 +273,15 @@ def create_test_data():
                 printer_id=test_printer9.id,
                 print_request_id=print_request1.id
             ),
-            Filament(
-                id=str(uuid.uuid4()),
-                name="Black PLA",
-                price_per_gram=0.25,
-                color_id=black.id,
-                material_id=pla.id,
-                printer_id=test_printer9.id,
-                print_request_id=print_request1.id
-            ),
+            # Filament(
+            #     id=str(uuid.uuid4()),
+            #     name="Black PLA",
+            #     price_per_gram=0.25,
+            #     color_id=black.id,
+            #     material_id=pla.id,
+            #     printer_id=test_printer9.id,
+            #     print_request_id=print_request1.id
+            # ),
             
             # Printer 10 filaments (192.168.1.10)
             Filament(
@@ -290,18 +290,18 @@ def create_test_data():
                 price_per_gram=0.25,
                 color_id=white.id,
                 material_id=pla.id,
-                printer_id=test_printer10.id,
+                printer_id=test_printer7.id,
                 print_request_id=print_request1.id
             ),
-            Filament(
-                id=str(uuid.uuid4()),
-                name="Red PLA",
-                price_per_gram=0.25,
-                color_id=red.id,
-                material_id=pla.id,
-                printer_id=test_printer10.id,
-                print_request_id=print_request1.id
-            )
+            # Filament(
+            #     id=str(uuid.uuid4()),
+            #     name="Red PLA",
+            #     price_per_gram=0.25,
+            #     color_id=red.id,
+            #     material_id=pla.id,
+            #     printer_id=test_printer10.id,
+            #     print_request_id=print_request1.id
+            # )
         ]
             
         db.session.add_all(filaments)

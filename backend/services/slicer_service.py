@@ -135,9 +135,12 @@ class SlicerService:
             )
             print_request.filaments.append(filament)
             
-            # Make sure printer_id is properly set
-            if 'printer' in file_info and hasattr(file_info['printer'], 'printer_id'):
-                print_request.printer_id = file_info['printer'].printer_id
+            if 'printer' in file_info:
+                printer = file_info['printer']
+                if hasattr(printer, 'id'):
+                    print_request.printer_id = printer.id
+                elif isinstance(printer, dict) and 'id' in printer:
+                    print_request.printer_id = printer['id']
             elif 'printer_id' in file_info:
                 print_request.printer_id = file_info['printer_id']
             else:
@@ -148,7 +151,7 @@ class SlicerService:
                     self.logger.info(f"Assigned default printer {default_printer.name} to print request")
                 else:
                     self.logger.warning("No available printer found for print request")
-            
+                    
             db.session.add(print_request)
             db.session.flush()
             
