@@ -21,8 +21,9 @@ import PrintingProgress from './components/PrintProgress';
 import Landing from './components/Landing';
 import AuthPage from './components/authPage';
 import Navbar from './components/Navbar';
-import UserProfile from './components/UserProfile';
 import PrinterAdmin from './components/Admin/PrinterAdmin';
+import UserProfile from './components/UserProfile';
+
 import AdminInfo from './components/AdminInfo';
 import StarsBackground from './components/StarsBackground'; // Import the new component
 import { getCurrentUser } from './api/endpoints/authEndpoints';
@@ -422,6 +423,14 @@ function App() {
                         element={
                             <ProtectedAdminRoute>
                                 <AdminInfo />
+                            </ProtectedAdminRoute>
+                        } 
+                    />
+                                        <Route 
+                        path="/adminPrinter" 
+                        element={
+                            <ProtectedAdminRoute>
+                                <PrinterAdmin/>
                             </ProtectedAdminRoute>
                         } 
                     />
