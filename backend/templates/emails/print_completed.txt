@@ -9,12 +9,17 @@ Print Details:
 File Name: {{ file_name }}
 Completion Date: {{ print_date }}
 Print Duration: {{ print_duration }}
-Filament: {{ print_settings.filament }}
-Dimension: {{ print_settings.dimension }}
-Filling: {{ print_settings.filling }}
-Layer: {{ print_settings.layer }}
+{% if printer_name %}Printer: {{ printer_name }}{% endif %}
 
-You can pick up your print at your convenience. #TODO
+Print settings:
+---------------
+Dimensions: {{ print_settings.dimension }}
+Infill: {{ print_settings.filling }}%
+Layer Height: {{ print_settings.layer_height }}mm
+{% if print_settings.material %}Material: {{ print_settings.material }}{% endif %}
+{% if print_settings.color %}Color: {{ print_settings.color }}{% endif %}
+
+Your print is now ready for pickup. Please collect it at your earliest convenience.
 
 Thank you for using PolyPrint 3D!
 

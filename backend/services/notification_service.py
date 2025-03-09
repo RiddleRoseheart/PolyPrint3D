@@ -78,13 +78,25 @@ class NotificationService:
                 'print_date': datetime.now().strftime('%Y-%m-%d %H:%M'),
                 'print_duration': self._calculate_duration(print_request),
                 'print_settings': {
-                    'filament': print_request.filament,
-                    'dimension': print_request.dimension,
-                    'filling': print_request.filling,
-                    'layer': print_request.layer
+                'dimension': print_request.dimension,
+                'filling': print_request.filling,
+                'layer_height': print_request.layer_height
                 }
             }
+
+            # Add material and color info if available
+            if print_request.filaments and len(print_request.filaments) > 0:
+                filament = print_request.filaments[0]
+                material_name = filament.material.name if filament.material else None
+                color_name = filament.color.name if filament.color else None
             
+                data['print_settings']['material'] = material_name or 'Unknown'
+                data['print_settings']['color'] = color_name or 'Unknown'
+            
+            # Add printer info if available
+            if print_request.printer:
+                data['printer_name'] = print_request.printer.name
+
             return self.send_email(
                 recipient=user.email,
                 subject="Your 3D Print Has Completed!",
