@@ -63,7 +63,7 @@ class FileManager:
         """Generate a unique folder name using timestamp."""
         timestamp = datetime.now().strftime("%Y%m%d")
         pattern = f"{prefix}_{timestamp}_\\d+"
-   
+
         # local or remote
         if self.is_connected:
             try:
@@ -74,7 +74,9 @@ class FileManager:
             except IOError:
                 existing_folders = []
         else:
-            # Local mode
+
+            # Local mode 
+
             try:
                 existing_folders = [
                     f.name for f in self.local_output_path.glob(f"{prefix}_{timestamp}_*")
@@ -82,7 +84,7 @@ class FileManager:
                 ]
             except IOError:
                 existing_folders = []
-           
+
         if not existing_folders:
             increment = 1
         else:
@@ -170,6 +172,7 @@ class FileManager:
         Args:
             job_name: Name of the job folder
             file_type: 'stl' or 'gcode'
+
             group_number: Number for the group file
            
         Returns:
@@ -178,6 +181,7 @@ class FileManager:
         remote_path = self.get_job_file_path(job_name, file_type, group_number)
         local_path = self.local_output_path / job_name / file_type / f"group_{group_number}.{file_type}"
        
+
         return remote_path, str(local_path)
    
     def mkdir_p(self, remote_directory):
@@ -290,5 +294,6 @@ class FileManager:
             self.sftp.stat(remote_path)
             return True
         except IOError:
+
             return False
- 
+

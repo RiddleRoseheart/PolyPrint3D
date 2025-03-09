@@ -34,6 +34,14 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import PersonIcon from '@mui/icons-material/Person';
 import { getAlerts, markAlertAsRead } from '../../api/endpoints/alertEndpoints';
 
+// Define color constants that won't be affected by theme
+const alertColors = {
+  error: '#f44336',
+  warning: '#ff9800',
+  success: '#4caf50',
+  info: '#2196f3'
+};
+
 const AlertSection = () => {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,17 +103,18 @@ const AlertSection = () => {
     });
   };
 
-  // Get icon based on alert type
+  // Get icon based on alert type (UPDATED)
   const getAlertIcon = (type) => {
+    // Use explicit colors instead of theme colors
     switch (type) {
       case 'success':
-        return <CheckCircleIcon color="success" />;
+        return <CheckCircleIcon sx={{ color: alertColors.success, fontSize: 28 }} />;
       case 'error':
-        return <ErrorIcon color="error" />;
+        return <ErrorIcon sx={{ color: alertColors.error, fontSize: 28 }} />;
       case 'warning':
-        return <WarningIcon color="warning" />;
+        return <WarningIcon sx={{ color: alertColors.warning, fontSize: 28 }} />;
       default:
-        return <InfoIcon color="info" />;
+        return <InfoIcon sx={{ color: alertColors.info, fontSize: 28 }} />;
     }
   };
 
@@ -189,7 +198,7 @@ const AlertSection = () => {
         </Box>
       </Box>
       
-      {/* Tabs for alert categories */}
+      {/* Tabs for alert categories (UPDATED) */}
       <Tabs 
         value={activeTab} 
         onChange={handleTabChange} 
@@ -201,25 +210,25 @@ const AlertSection = () => {
         <Tab 
           label="Errors" 
           value="error" 
-          icon={<ErrorIcon color="error" fontSize="small" />} 
+          icon={<ErrorIcon sx={{ color: alertColors.error }} />} 
           iconPosition="start"
         />
         <Tab 
           label="Warnings" 
           value="warning" 
-          icon={<WarningIcon color="warning" fontSize="small" />} 
+          icon={<WarningIcon sx={{ color: alertColors.warning }} />} 
           iconPosition="start"
         />
         <Tab 
           label="Success" 
           value="success" 
-          icon={<CheckCircleIcon color="success" fontSize="small" />} 
+          icon={<CheckCircleIcon sx={{ color: alertColors.success }} />} 
           iconPosition="start"
         />
         <Tab 
           label="Info" 
           value="info" 
-          icon={<InfoIcon color="info" fontSize="small" />} 
+          icon={<InfoIcon sx={{ color: alertColors.info }} />} 
           iconPosition="start"
         />
       </Tabs>
@@ -322,21 +331,24 @@ const AlertSection = () => {
                 sx={{ 
                   opacity: alert.is_read ? 0.7 : 1,
                   borderLeft: alert.is_read ? 'none' : `4px solid ${
-                    alert.type === 'error' ? '#f44336' : 
-                    alert.type === 'warning' ? '#ff9800' : 
-                    alert.type === 'success' ? '#4caf50' : 
-                    '#2196f3'
+                    alert.type === 'error' ? alertColors.error : 
+                    alert.type === 'warning' ? alertColors.warning : 
+                    alert.type === 'success' ? alertColors.success : 
+                    alertColors.info
                   }`,
-                  pl: alert.is_read ? 2 : 1
+                  pl: alert.is_read ? 2 : 1,
+                  py: 1.5 // Added more padding for larger items
                 }}
               >
-                <ListItemIcon>
+                <ListItemIcon sx={{ minWidth: 50 }}> {/* Increased min width for larger icons */}
                   {getAlertIcon(alert.type)}
                 </ListItemIcon>
                 <ListItemText
                   primary={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {alert.title}
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}> {/* Increased text size */}
+                        {alert.title}
+                      </Typography>
                       {alert.source && (
                         <Chip 
                           size="small" 
@@ -350,7 +362,9 @@ const AlertSection = () => {
                   }
                   secondary={
                     <>
-                      {alert.message}
+                      <Typography variant="body2"> {/* Increased size of message text */}
+                        {alert.message}
+                      </Typography>
                       <Typography variant="caption" display="block" color="text.secondary">
                         {formatDate(alert.timestamp)}
                       </Typography>

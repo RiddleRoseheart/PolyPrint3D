@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -26,6 +26,7 @@ import SelectAllIcon from '@mui/icons-material/SelectAll';
 import PriceCheckIcon from '@mui/icons-material/PriceCheck';
 import axiosInstance from '../api/axiosConfig';
 import { sendToPrinter } from '../api/endpoints/printerEndpoints'; 
+
 import { 
     Info as InfoIcon
 } from '@mui/icons-material';
@@ -49,20 +50,15 @@ const PreviewContainer = ({ children, isLoading }) => (
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                backgroundColor: 'rgba(31, 31, 31, 0.7)',
+                zIndex: 10,
             }}>
-                <CircularProgress />
+                <CircularProgress sx={{ color: 'white' }} />
             </Box>
         )}
     </Box>
 );
 
-/**
- * Format price value to currency string
- * @param {number} price - Price value to format
- * @param {string} currency - Currency code (default: EUR)
- * @returns {string} Formatted price string
- */
 const formatPrice = (price, currency = 'EUR') => {
     if (price === undefined || price === null) return '—';
     
@@ -75,13 +71,15 @@ const formatPrice = (price, currency = 'EUR') => {
 
 const isWebGLAvailable = () => {
     try {
-      const canvas = document.createElement('canvas');
-      return !!(window.WebGLRenderingContext && 
-        (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+        const canvas = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && 
+          (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
     } catch(e) {
-      return false;
+        console.error("WebGL not available:", e);
+        return false;
     }
 };
+
   
 /**
  * Main component for previewing sliced 3D files
@@ -94,21 +92,33 @@ const isWebGLAvailable = () => {
  */
 const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart, isLocalMode }) => {
     const [selectedSlices, setSelectedSlices] = useState(new Set());
+    const [selectedRequests, setSelectedRequests] = useState(new Set());
     const [activePreview, setActivePreview] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
-    const [selectedRequests, setSelectedRequests] = useState(new Set());
-    const [sceneInitialized, setSceneInitialized] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [webGLAvailable, setWebGLAvailable] = useState(true);
+    const [rendererReady, setRendererReady] = useState(false);
+    const [sceneInitialized, setSceneInitialized] = useState(false);
+    const [previewRequestStatus, setPreviewRequestStatus] = useState({
+        pending: false,
+        success: false,
+        error: null
+    });
     
-    // Three.js refs
-    const mountRef = useRef(null);
+    // THREE.js refs
+    const containerRef = useRef(null);
     const sceneRef = useRef(null);
     const cameraRef = useRef(null);
-    const controlsRef = useRef(null);
     const rendererRef = useRef(null);
+    const controlsRef = useRef(null);
     const meshRef = useRef(null);
-    const initialLoadRef = useRef(false);
+    const animationFrameIdRef = useRef(null);
+    const mountedRef = useRef(true);
+    const sceneMounted = useRef(false);
+    const resizeHandlerRef = useRef(null);
+    const throttleTimerRef = useRef(null);
+
 
     /**
  * Send selected print jobs to printers
@@ -144,6 +154,7 @@ const handlePrintStart = async (selectedRequestIds) => {
      * @returns {number} Total price of selected items
      */
     const calculateSelectedPrice = () => {
+
         if (!slicingResult?.print_requests) return 0;
         
         return slicingResult.print_requests
@@ -151,628 +162,765 @@ const handlePrintStart = async (selectedRequestIds) => {
             .reduce((sum, request) => sum + (parseFloat(request.price) || 0), 0);
     };
 
-    /**
-     * Get total project price directly from slicing result
-     * @returns {number} Total project price
-     */
+    // Get total project price
     const getTotalPrice = () => {
         if (!slicingResult?.print_requests) return 0;
         
-        // Calculate total from all print requests
         return slicingResult.print_requests.reduce((sum, request) => 
             sum + (parseFloat(request.price) || 0), 0);
     };
 
-    /**
-     * Initialize Three.js scene
-     */
-    useEffect(() => {
-        if (!mountRef.current || sceneInitialized) return;
-
-        const setupScene = () => {
-            if (!isWebGLAvailable()) {
-                setError('WebGL is not supported in your browser. Cannot display 3D preview.');
-                return () => {};
-            }
-            
+    // Safe method to clear container contents
+    const clearContainer = useCallback(() => {
+        if (containerRef.current) {
             try {
-                const width = mountRef.current.clientWidth;
-                const height = mountRef.current.clientHeight;
-
-                // Create scene
-                const scene = new THREE.Scene();
-                scene.background = new THREE.Color(0xf5f5f5);
-
-                // Set up camera
-                const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-                camera.position.set(0, 10, 20);
-                
-                // Set up renderer with error handling
-                let renderer;
-                try {
-                    renderer = new THREE.WebGLRenderer({ 
-                        antialias: true,
-                        alpha: true,
-                        powerPreference: 'default'
-                    });
-                    
-                    // Check if renderer was created successfully
-                    if (!renderer || !renderer.domElement) {
-                        throw new Error('Failed to initialize WebGL renderer');
-                    }
-                    
-                    renderer.setSize(width, height);
-                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio
-                    
-                    // Clear any existing content
-                    while (mountRef.current.firstChild) {
-                        mountRef.current.removeChild(mountRef.current.firstChild);
-                    }
-                    
-                    mountRef.current.appendChild(renderer.domElement);
-                } catch (renderError) {
-                    console.error('WebGL renderer error:', renderError);
-                    setError('Failed to initialize 3D preview. WebGL error occurred.');
-                    return () => {};
+                // Safer way to clear children
+                while (containerRef.current.firstChild) {
+                    containerRef.current.firstChild.remove();
                 }
-
-                // Set up controls
-                const controls = new OrbitControls(camera, renderer.domElement);
-                controls.enableDamping = true;
-                
-                // Save refs
-                sceneRef.current = scene;
-                cameraRef.current = camera;
-                controlsRef.current = controls;
-                rendererRef.current = renderer;
-
-                // Setup initial lighting
-                const setupLighting = () => {
-                    if (!sceneRef.current) return;
-                    
-                    // Clear previous lights but keep meshes
-                    sceneRef.current.children = sceneRef.current.children.filter(
-                        child => !(child instanceof THREE.Light)
-                    );
-                    
-                    const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
-                    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                    const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
-                    
-                    directionalLight.position.set(1, 1, 1);
-                    backLight.position.set(-1, -1, -1);
-                    
-                    sceneRef.current.add(ambientLight, directionalLight, backLight);
-                };
-
-                setupLighting();
-
-                // Handle WebGL context loss
-                const handleContextLost = (event) => {
-                    event.preventDefault();
-                    console.warn('WebGL context lost. Attempting to recover...');
-                    setError('WebGL context lost. Please reload the page if 3D preview doesn\'t recover.');
-                    
-                    // Try to reinitialize after a brief delay
-                    setTimeout(() => {
-                        if (mountRef.current) {
-                            mountRef.current.innerHTML = '';
-                            setupScene();
-                        }
-                    }, 2000);
-                };
-
-                renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
-                renderer.domElement.addEventListener('webglcontextrestored', () => {
-                    console.log('WebGL context restored');
-                    setError('');
-                });
-
-                // Animation loop with error handling
-                let animFrameId;
-                const animate = () => {
-                    try {
-                        animFrameId = requestAnimationFrame(animate);
-                        if (controls) controls.update();
-                        if (renderer && scene && camera) {
-                            renderer.render(scene, camera);
-                        }
-                    } catch (renderError) {
-                        console.error('Render loop error:', renderError);
-                        setError('Error displaying 3D preview. Try reloading the page.');
-                        cancelAnimationFrame(animFrameId);
-                    }
-                };
-                
-                animate();
-
-                // Handle window resizing
-                const handleResize = () => {
-                    if (!mountRef.current || !renderer) return;
-                    
-                    try {
-                        const width = mountRef.current.clientWidth;
-                        const height = mountRef.current.clientHeight;
-                        
-                        if (camera) {
-                            camera.aspect = width / height;
-                            camera.updateProjectionMatrix();
-                        }
-                        
-                        renderer.setSize(width, height);
-                    } catch (resizeError) {
-                        console.error('Resize error:', resizeError);
-                    }
-                };
-                
-                window.addEventListener('resize', handleResize);
-                
-                setSceneInitialized(true);
-                
-                return () => {
-                    window.removeEventListener('resize', handleResize);
-                    if (animFrameId) cancelAnimationFrame(animFrameId);
-                    
-                    if (controls) {
-                        controls.dispose();
-                    }
-                    
-                    if (renderer) {
-                        renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
-                        renderer.domElement.removeEventListener('webglcontextrestored', () => {});
-                        
-                        try {
-                            renderer.dispose();
-                            
-                            // Force context loss to ensure proper cleanup
-                            const extension = renderer.getContext().getExtension('WEBGL_lose_context');
-                            if (extension) extension.loseContext();
-                        } catch (disposeError) {
-                            console.error('Error disposing renderer:', disposeError);
-                        }
-                    }
-                    
-                    if (meshRef.current) {
-                        try {
-                            if (sceneRef.current) sceneRef.current.remove(meshRef.current);
-                            if (meshRef.current.geometry) meshRef.current.geometry.dispose();
-                            if (meshRef.current.material) {
-                                if (Array.isArray(meshRef.current.material)) {
-                                    meshRef.current.material.forEach(material => material.dispose());
-                                } else {
-                                    meshRef.current.material.dispose();
-                                }
-                            }
-                        } catch (meshDisposeError) {
-                            console.error('Error disposing mesh:', meshDisposeError);
-                        }
-                        
-                        meshRef.current = null;
-                    }
-                    
-                    if (mountRef.current) {
-                        mountRef.current.innerHTML = '';
-                    }
-                    
-                    sceneRef.current = null;
-                    cameraRef.current = null;
-                    controlsRef.current = null;
-                    rendererRef.current = null;
-                    setSceneInitialized(false);
-                };
-            } catch (error) {
-                console.error('Scene setup error:', error);
-                setError('Failed to initialize 3D preview');
-                return () => {};
+            } catch (e) {
+                console.warn('Error clearing container:', e);
+                // Fallback to innerHTML if remove() fails
+                containerRef.current.innerHTML = '';
             }
-        };
+        }
+    }, []);
 
-        return setupScene();
-    }, [mountRef.current]);
-
-    /**
-     * Handle initial loading of the first preview when slicing result changes
-     */
-    useEffect(() => {
-        if (slicingResult?.print_requests?.length > 0 && sceneInitialized && !initialLoadRef.current) {
-            // Load the first file by default
-            setActivePreview(slicingResult.print_requests[0]);
-            
-            // Also select the first request by default
-            setSelectedRequests(new Set([slicingResult.print_requests[0].id]));
-            
-            initialLoadRef.current = true;
+    // Clean up THREE.js resources
+    const cleanupThreeJS = useCallback(() => {
+        console.log('Cleaning up THREE.js resources');
+        
+        // Clear throttle timer
+        if (throttleTimerRef.current) {
+            clearTimeout(throttleTimerRef.current);
+            throttleTimerRef.current = null;
         }
         
-        // Reset the initialLoad flag when slicing result changes
-        if (!slicingResult || slicingResult.print_requests?.length === 0) {
-            initialLoadRef.current = false;
+        // Remove resize handler
+        if (resizeHandlerRef.current) {
+            window.removeEventListener('resize', resizeHandlerRef.current);
+            resizeHandlerRef.current = null;
         }
-    }, [slicingResult, sceneInitialized]);
-
-    /**
-     * Toggle selection of a print request
-     * @param {Object} request - The print request to toggle
-     */
-    const handleRequestToggle = (request) => {
-        const newSelected = new Set(selectedRequests);
-        if (newSelected.has(request.id)) {
-            newSelected.delete(request.id);
-        } else {
-            newSelected.add(request.id);
+        
+        // Cancel animation frame
+        if (animationFrameIdRef.current) {
+            cancelAnimationFrame(animationFrameIdRef.current);
+            animationFrameIdRef.current = null;
         }
-        setSelectedRequests(newSelected);
-    };
-
-    /**
-     * Load and display STL preview
-     */
-    useEffect(() => {
-        if (!activePreview || !sceneRef.current || !cameraRef.current || !sceneInitialized) return;
-
-        const loadSTL = async () => {
-            try {
-                setIsLoading(true);
-                setError('');
-                
-                // Get the color from the active preview
-                // Default to green if color is not specified
-                let materialColor = 0x00ff00;
-                if (activePreview.filaments && activePreview.filaments[0]?.color) {
-                    const colorString = activePreview.filaments[0].color;
-                    // Convert color string to hex if it's not already
-                    materialColor = colorString.startsWith('#') 
-                        ? parseInt(colorString.replace('#', '0x'), 16)
-                        : colorString;
-                }
-
-                const response = await axiosInstance.get(`/api/slicer/preview/${activePreview.id}`, {
-                    responseType: 'arraybuffer',
-                    headers: {
-                        'Accept': 'application/octet-stream'
-                    }
-                });
-
-                // Clear previous mesh
-                if (meshRef.current) {
-                    sceneRef.current.remove(meshRef.current);
-                    meshRef.current.geometry.dispose();
+        
+        // Dispose controls
+        if (controlsRef.current) {
+            controlsRef.current.dispose();
+            controlsRef.current = null;
+        }
+        
+        // Dispose mesh and geometry
+        if (meshRef.current) {
+            if (sceneRef.current) {
+                sceneRef.current.remove(meshRef.current);
+            }
+            
+            if (meshRef.current.geometry) {
+                meshRef.current.geometry.dispose();
+            }
+            
+            if (meshRef.current.material) {
+                if (Array.isArray(meshRef.current.material)) {
+                    meshRef.current.material.forEach(material => material.dispose());
+                } else {
                     meshRef.current.material.dispose();
                 }
+            }
+            
+            meshRef.current = null;
+        }
+        
+        // Dispose renderer
+        if (rendererRef.current) {
+            try {
+                rendererRef.current.dispose();
+            } catch (e) {
+                console.error('Error disposing renderer:', e);
+            }
+            rendererRef.current = null;
+        }
+        
+        // Clear container - but only if we need to
+        if (sceneMounted.current) {
+            clearContainer();
+            sceneMounted.current = false;
+        }
+        
+        // Reset refs
+        sceneRef.current = null;
+        cameraRef.current = null;
+        
+        setRendererReady(false);
+    }, [clearContainer]);
 
-                const loader = new STLLoader();
-                const geometry = loader.parse(response.data);
-                const material = new THREE.MeshPhongMaterial({
-                    color: materialColor,
-                    specular: 0x111111,
-                    shininess: 200
-                });
-                const mesh = new THREE.Mesh(geometry, material);
-                meshRef.current = mesh;
+    // Add lighting to the scene
+    const addLighting = useCallback((scene) => {
+        // Ambient light
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
+        scene.add(ambientLight);
+        
+        // Directional light (sun-like)
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+        
+        // Back light for better definition
+        const backLight = new THREE.DirectionalLight(0xffffff, 3);
+        backLight.position.set(-1, -1, -1);
+        scene.add(backLight);
+    }, []);
 
-                // Center and scale mesh
-                geometry.computeBoundingBox();
-                const center = geometry.boundingBox.getCenter(new THREE.Vector3());
-                mesh.position.sub(center);
+    // Throttled render function to improve performance
+    const throttledRender = useCallback(() => {
+        if (throttleTimerRef.current) return;
+        
+        throttleTimerRef.current = setTimeout(() => {
+            throttleTimerRef.current = null;
+            
+            if (rendererRef.current && sceneRef.current && cameraRef.current) {
+                rendererRef.current.render(sceneRef.current, cameraRef.current);
+            }
+        }, 16); // ~60fps
+    }, []);
+
+    // Initialize THREE.js scene
+    const initScene = useCallback(() => {
+        try {
+            if (!containerRef.current) {
+                console.error('Container ref not available');
+                return;
+            }
+
+            // First clean up any existing scene
+            cleanupThreeJS();
+
+            console.log('Creating scene');
+            // Create scene
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000); // Black background for monochrome theme
+            sceneRef.current = scene;
+
+            // Get container dimensions
+            const width = containerRef.current.clientWidth;
+            const height = containerRef.current.clientHeight;
+            console.log('Container dimensions:', width, 'x', height);
+            
+            if (width === 0 || height === 0) {
+                console.warn('Container has zero width or height');
+                return;
+            }
+
+            // Create camera
+            const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.set(0, 10, 20);
+            cameraRef.current = camera;
+
+            // Create renderer
+            console.log('Creating WebGL renderer');
+            const renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true,
+                powerPreference: 'default'
+            });
+            renderer.setSize(width, height);
+            // Limit pixel ratio to improve performance
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            
+            // Clear any existing content
+            clearContainer();
+            
+            // Add renderer to DOM
+            containerRef.current.appendChild(renderer.domElement);
+            rendererRef.current = renderer;
+            sceneMounted.current = true;
+
+            // Create controls with reduced performance impact
+            console.log('Creating OrbitControls');
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1; // Higher value = less physics but better performance
+            controls.enableZoom = true;
+            controls.zoomSpeed = 0.8; // Slightly reduced zoom speed
+            controls.rotateSpeed = 0.8; // Slightly reduced rotate speed
+            controls.screenSpacePanning = true;
+            controls.autoRotate = false; // No auto-rotation
+            controlsRef.current = controls;
+
+            // Add lighting
+            addLighting(scene);
+
+            // Handle browser resize with throttling
+            const handleResize = () => {
+                if (throttleTimerRef.current) return;
                 
-                const box = new THREE.Box3().setFromObject(mesh);
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z);
+                throttleTimerRef.current = setTimeout(() => {
+                    throttleTimerRef.current = null;
+                    
+                    if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
+                    
+                    const width = containerRef.current.clientWidth;
+                    const height = containerRef.current.clientHeight;
+                    
+                    if (width === 0 || height === 0) return;
+                    
+                    cameraRef.current.aspect = width / height;
+                    cameraRef.current.updateProjectionMatrix();
+                    
+                    rendererRef.current.setSize(width, height);
+                }, 150); // Throttle resize events
+            };
+            resizeHandlerRef.current = handleResize;
+            window.addEventListener('resize', handleResize);
 
-                // Setup camera and controls
-                setupCameraAndControls(maxDim);
+            // Animation loop with throttling
+            let lastRenderTime = 0;
+            const animate = (time) => {
+                if (!mountedRef.current) return;
                 
-                // Add mesh to scene
+                animationFrameIdRef.current = requestAnimationFrame(animate);
+                
+                // Throttle renders to ~30fps to reduce performance impact
+                if (time - lastRenderTime < 33) { // ~30fps (1000ms / 30 = 33.33)
+                    return;
+                }
+                
+                if (controlsRef.current) {
+                    controlsRef.current.update();
+                }
+                
+                if (rendererRef.current && sceneRef.current && cameraRef.current) {
+                    rendererRef.current.render(sceneRef.current, cameraRef.current);
+                    lastRenderTime = time;
+                }
+            };
+            animate(0);
+            
+            setRendererReady(true);
+            console.log('THREE.js scene initialized successfully');
+            
+        } catch (error) {
+            console.error('Failed to initialize THREE.js scene:', error);
+            setError(`Failed to initialize 3D preview: ${error.message}`);
+        }
+    }, [addLighting, cleanupThreeJS, clearContainer]);
+
+    // Position model in scene
+    const positionModel = useCallback((mesh, geometry) => {
+        // Center the model
+        geometry.computeBoundingBox();
+        const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+        mesh.position.sub(center);
+        
+        // Scale camera distance based on model size
+        const box = new THREE.Box3().setFromObject(mesh);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        
+        if (cameraRef.current && controlsRef.current) {
+            cameraRef.current.position.set(0, maxDim, maxDim * 2);
+            cameraRef.current.lookAt(0, 0, 0);
+            
+            controlsRef.current.minDistance = maxDim * 0.5;
+            controlsRef.current.maxDistance = maxDim * 4;
+            controlsRef.current.update();
+        }
+    }, []);
+
+    // Clear existing mesh
+    const clearExistingMesh = useCallback(() => {
+        if (meshRef.current && sceneRef.current) {
+            sceneRef.current.remove(meshRef.current);
+            
+            if (meshRef.current.geometry) {
+                meshRef.current.geometry.dispose();
+            }
+            
+            if (meshRef.current.material) {
+                if (Array.isArray(meshRef.current.material)) {
+                    meshRef.current.material.forEach(material => material.dispose());
+                } else {
+                    meshRef.current.material.dispose();
+                }
+            }
+            
+            meshRef.current = null;
+        }
+    }, []);
+
+    // Get material color from request
+    const getMaterialColor = useCallback((request) => {
+        // Default to white for monochrome theme
+        let materialColor = 0xffffff;
+        
+        if (request?.filaments && request.filaments[0]?.color) {
+            const colorString = request.filaments[0].color;
+            
+            // Convert color string to hex if it's not already
+            try {
+                if (colorString.startsWith('#')) {
+                    materialColor = parseInt(colorString.replace('#', '0x'), 16);
+                } else if (typeof colorString === 'string') {
+                    // For monochrome theme, all colors are white with varying brightness
+                    materialColor = 0xffffff; // Use white for all colors
+                }
+            } catch (e) {
+                console.warn('Error parsing color:', e);
+            }
+        }
+        
+        return materialColor;
+    }, []);
+
+    // Load STL preview
+    const loadSTLPreview = useCallback(async (requestId) => {
+        if (!requestId || !rendererReady) {
+            console.log('Cannot load STL preview - missing requestId or renderer not ready');
+            return;
+        }
+        
+        setIsLoading(true);
+        setPreviewRequestStatus({ pending: true, success: false, error: null });
+        setError('');
+        
+        try {
+            console.log(`Fetching STL preview for request ${requestId}`);
+            const response = await axiosInstance.get(`/api/slicer/preview/${requestId}`, {
+                responseType: 'arraybuffer',
+                headers: {
+                    'Accept': 'application/octet-stream'
+                }
+            });
+            
+            if (!mountedRef.current) return;
+            
+            console.log(`Received STL data: ${response.data.byteLength} bytes`);
+            
+            // Verify data
+            if (!response.data || response.data.byteLength === 0) {
+                throw new Error('Received empty STL data');
+            }
+            
+            // Clear existing mesh
+            clearExistingMesh();
+            
+            // Parse STL
+            const loader = new STLLoader();
+            const geometry = loader.parse(response.data);
+            
+            // Get material color
+            const activeRequest = slicingResult?.print_requests?.find(r => r.id === requestId);
+            const materialColor = getMaterialColor(activeRequest);
+            
+            // Create mesh with white material for monochrome theme
+            const material = new THREE.MeshPhongMaterial({
+                color: materialColor,
+                specular: 0x444444,
+                shininess: 100,
+                emissive: 0x222222,
+                emissiveIntensity: 0.1
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            meshRef.current = mesh;
+            
+            // Position model
+            positionModel(mesh, geometry);
+            
+            // Add to scene
+            if (sceneRef.current) {
                 sceneRef.current.add(mesh);
-
-            } catch (error) {
-                console.error('STL loading error:', error);
-                setError('Failed to load 3D preview');
-            } finally {
+            }
+            
+            setPreviewRequestStatus({ pending: false, success: true, error: null });
+            console.log('STL preview loaded successfully');
+            
+            // Force a render since we're throttling the animation loop
+            if (rendererRef.current && sceneRef.current && cameraRef.current) {
+                rendererRef.current.render(sceneRef.current, cameraRef.current);
+            }
+            
+        } catch (error) {
+            console.error('Failed to load STL preview:', error);
+            setPreviewRequestStatus({ pending: false, success: false, error: error.message });
+            setError(`Failed to load 3D preview: ${error.message}`);
+        } finally {
+            if (mountedRef.current) {
                 setIsLoading(false);
             }
+        }
+    }, [rendererReady, clearExistingMesh, getMaterialColor, positionModel, slicingResult]);
+
+    // Check if component is still mounted
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
         };
+    }, []);
 
-        loadSTL();
-    }, [activePreview, sceneInitialized]);
+    // Initialization and cleanup
+    useEffect(() => {
+        console.log('SlicedFilesPreview mounted');
+        
+        // Check WebGL support
+        const webGLSupported = isWebGLAvailable();
+        setWebGLAvailable(webGLSupported);
+        if (!webGLSupported) {
+            setError('Your browser does not support WebGL, which is required for 3D model previews.');
+        }
+        
+        // Clean up on unmount
+        return () => {
+            console.log('SlicedFilesPreview unmounting');
+            mountedRef.current = false;
+            cleanupThreeJS();
+        };
+    }, [cleanupThreeJS]);
 
-    /**
-     * Set up camera and controls for the 3D preview
-     * @param {number} maxDim - Maximum dimension of the object
-     */
-    const setupCameraAndControls = (maxDim) => {
-        if (!cameraRef.current || !controlsRef.current) return;
+    // Handle slicing result changes
+    useEffect(() => {
+        if (slicingResult) {
+            console.log('Slicing result received:', 
+                slicingResult.print_requests ? 
+                `${slicingResult.print_requests.length} print requests` : 
+                'No print requests'
+            );
+            
+            // Reset current selection
+            setSelectedRequests(new Set());
+            setActivePreview(null);
+            
+            // Auto-select first preview after receiving results
+            if (slicingResult.print_requests && slicingResult.print_requests.length > 0) {
+                const firstRequest = slicingResult.print_requests[0];
+                console.log('Auto-selecting first request:', firstRequest.id);
+                
+                // Short delay to allow UI to update first
+                setTimeout(() => {
+                    if (mountedRef.current) {
+                        setActivePreview(firstRequest);
+                        setSelectedRequests(new Set([firstRequest.id]));
+                    }
+                }, 100);
+            }
+        } else {
+            console.log('No slicing result available');
+        }
+    }, [slicingResult]);
+
+    // Initialize THREE.js scene
+    useEffect(() => {
+        if (!containerRef.current || !webGLAvailable || rendererReady) return;
+        
+        console.log('Initializing THREE.js scene');
+        
+        // Short timeout to ensure DOM is ready
+        const timeoutId = setTimeout(() => {
+            if (mountedRef.current) {
+                initScene();
+            }
+        }, 100);
+        
+        return () => {
+            clearTimeout(timeoutId);
+        };
+    }, [webGLAvailable, rendererReady, initScene]);
+
+    // Handle active preview change
+    useEffect(() => {
+        if (!activePreview || !rendererReady) return;
+        
+        console.log('Loading preview for request:', activePreview.id);
+        
+        // Clear any existing timeout
+        const timeoutId = setTimeout(() => {
+            if (mountedRef.current) {
+                loadSTLPreview(activePreview.id);
+            }
+        }, 100);
+        
+        return () => {
+            clearTimeout(timeoutId);
+        };
+    }, [activePreview, rendererReady, loadSTLPreview]);
+
+    // Toggle selection of a print request
+    const handleRequestToggle = useCallback((request) => {
+        setSelectedRequests(prev => {
+            const newSelected = new Set(prev);
+            if (newSelected.has(request.id)) {
+                newSelected.delete(request.id);
+            } else {
+                newSelected.add(request.id);
+            }
+            return newSelected;
+        });
+    }, []);
+
+    // Reset camera view
+    const handleResetView = useCallback(() => {
+        if (!meshRef.current || !cameraRef.current || !controlsRef.current) return;
+        
+        const box = new THREE.Box3().setFromObject(meshRef.current);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
         
         cameraRef.current.position.set(0, maxDim, maxDim * 2);
         cameraRef.current.lookAt(0, 0, 0);
-
-        controlsRef.current.enableDamping = true;
-        controlsRef.current.dampingFactor = 0.05;
-        controlsRef.current.screenSpacePanning = true;
-        controlsRef.current.minDistance = maxDim * 0.5;
-        controlsRef.current.maxDistance = maxDim * 4;
-        controlsRef.current.maxPolarAngle = Math.PI / 1.5;
+        
         controlsRef.current.target.set(0, 0, 0);
         controlsRef.current.update();
-    };
-
-    /**
-     * Set up lighting for the 3D scene
-     */
-    const setupLighting = () => {
-        if (!sceneRef.current) return;
         
-        // Clear previous lights but keep meshes
-        sceneRef.current.children = sceneRef.current.children.filter(
-            child => !(child instanceof THREE.Light)
-        );
-        
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
-        
-        directionalLight.position.set(1, 1, 1);
-        backLight.position.set(-1, -1, -1);
-        
-        sceneRef.current.add(ambientLight, directionalLight, backLight);
-    };
-
-    /**
-     * Toggle a slice selection
-     * @param {Object} slice - The slice to toggle
-     */
-    const handleSliceToggle = (slice) => {
-        const newSelected = new Set(selectedSlices);
-        if (newSelected.has(slice.id)) {
-            newSelected.delete(slice.id);
-        } else {
-            newSelected.add(slice.id);
+        // Force a render
+        if (rendererRef.current && sceneRef.current && cameraRef.current) {
+            rendererRef.current.render(sceneRef.current, cameraRef.current);
         }
-        setSelectedSlices(newSelected);
-    };
+    }, []);
 
-    /**
-     * Select or deselect all print requests
-     */
-    const handleSelectAll = () => {
-        if (selectedRequests.size === slicingResult?.print_requests?.length) {
-            setSelectedRequests(new Set());
-        } else {
-            setSelectedRequests(new Set(slicingResult?.print_requests?.map(request => request.id)));
-        }
-    };
+    // Select or deselect all print requests
+    const handleSelectAll = useCallback(() => {
+        if (!slicingResult?.print_requests) return;
+        
+        setSelectedRequests(prev => {
+            if (prev.size === slicingResult.print_requests.length) {
+                return new Set();
+            } else {
+                return new Set(slicingResult.print_requests.map(request => request.id));
+            }
+        });
+    }, [slicingResult]);
 
-    /**
-     * Reset the camera view to default position
-     */
-    const handleResetView = () => {
-        if (cameraRef.current && controlsRef.current && meshRef.current) {
-            const box = new THREE.Box3().setFromObject(meshRef.current);
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            
-            setupCameraAndControls(maxDim);
-        }
-    };
-
-    //TODO
-    const handleDownload = async (request) => {
+    // Download a single file
+    const handleDownload = useCallback(async (request) => {
+        if (isDownloading) return;
+        
+        setIsDownloading(true);
+        setError('');
+        
         try {
-            setIsLoading(true);
+            console.log(`Downloading G-code for request ${request.id}`);
             const response = await axiosInstance.get(`/api/slicer/download/${request.id}`, {
                 responseType: 'blob'
             });
             
-            // Create a download link
+            if (!mountedRef.current) return;
+            
+            // Create download link
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `print_${request.id}.gcode`);
+            
+            // Set filename
+            const material = request.filaments?.[0]?.name || 'unknown';
+            const color = request.filaments?.[0]?.color || 'unknown';
+            const filename = `print_${material}_${color}_${request.id}.gcode`;
+            
+            link.setAttribute('download', filename);
             document.body.appendChild(link);
             link.click();
             
             // Clean up
-            link.parentNode.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            setTimeout(() => {
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+            
+            console.log('Download complete');
         } catch (error) {
             console.error('Download error:', error);
-            
-            // Try to get more information about the error
-            if (error.response) {
-                if (error.response.data && typeof error.response.data === 'object') {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        try {
-                            const errorData = JSON.parse(reader.result);
-                            setError(`Download failed: ${errorData.error || 'Unknown error'}`);
-                        } catch (e) {
-                            setError(`Download failed: ${error.response.status} ${error.response.statusText}`);
-                        }
-                    };
-                    reader.readAsText(error.response.data);
-                } else {
-                    setError(`Download failed: ${error.response.status} ${error.response.statusText}`);
-                }
-            } else {
-                setError(`Download failed: ${error.message}`);
+            if (mountedRef.current) {
+                setError(`Failed to download file: ${error.message}`);
             }
         } finally {
-            setIsLoading(false);
+            if (mountedRef.current) {
+                setIsDownloading(false);
+            }
         }
-    };
+    }, [isDownloading]);
 
-    /**
-     * Download G-code files for selected print requests
-     */
-    const handleDownloadFiles = async () => {
+    // Download selected files
+    const handleDownloadFiles = useCallback(async () => {
+        if (selectedRequests.size === 0 || isDownloading) return;
+        
         setIsDownloading(true);
         setError('');
         
         try {
             const selectedRequestIds = Array.from(selectedRequests);
+            console.log(`Downloading ${selectedRequestIds.length} files`);
             
-            // Process each selected request one by one
+            // Process each selected request
             for (const requestId of selectedRequestIds) {
-                const request = slicingResult.print_requests.find(r => r.id === requestId);
+                if (!mountedRef.current) break;
+                
+                const request = slicingResult?.print_requests?.find(r => r.id === requestId);
                 if (!request) continue;
                 
-                // Get the G-code file for this request
-                const response = await axiosInstance.get(`/api/slicer/download/${requestId}`, {
-                    responseType: 'blob',
-                    headers: {
-                        'Accept': 'application/octet-stream'
-                    }
-                });
+                await handleDownload(request);
                 
-                // Create a download link
-                const url = window.URL.createObjectURL(response.data);
-                const link = document.createElement('a');
-                
-                // Set filename - use the material and color info if available
-                const material = request.filaments?.[0]?.name || 'unknown';
-                const color = request.filaments?.[0]?.color || 'unknown';
-                const filename = `print_${material}_${color}_${requestId}.gcode`;
-                
-                link.href = url;
-                link.setAttribute('download', filename);
-                document.body.appendChild(link);
-                link.click();
-                
-                // Clean up
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(link);
-                
-                // Small delay between downloads to ensure browser handles each one
+                // Small delay between downloads to avoid browser issues
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
-            
+
         } catch (error) {
-            console.error('Download error:', error);
-            setError('Failed to download one or more files. Please try again.');
+            console.error('Batch download error:', error);
+            if (mountedRef.current) {
+                setError(`Failed to download one or more files: ${error.message}`);
+            }
         } finally {
-            setIsDownloading(false);
+            if (mountedRef.current) {
+                setIsDownloading(false);
+            }
         }
-    };
-   
+    }, [selectedRequests, isDownloading, slicingResult, handleDownload]);
+
+    // Memoize print requests to prevent unnecessary re-renders
+    const printRequests = React.useMemo(() => {
+        return slicingResult?.print_requests || [];
+    }, [slicingResult?.print_requests]);
+
     return (
-        <Stack spacing={3} sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
-            {/* Local Mode Banner */}
-            {isLocalMode && (
-                <Paper 
-                    elevation={0}
-                    sx={{
-                        backgroundColor: '#fff3cd',
-                        color: '#856404',
-                        p: 2,
-                        mb: 3,
-                        borderRadius: 1,
-                        border: '1px solid #ffeeba',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}
-                >
-                    <Typography variant="body1">
-                        <strong>Network Connection Mode:</strong> You are not on the same network as the printers. You can only download files for manual printing.
+        <Stack spacing={3} sx={{ maxWidth: 2000, mt: 4, p: 2 }} border='5px solid rgb(54, 54, 54)'>
+            <Paper 
+                elevation={3} 
+                sx={{ 
+                    p: 0, 
+                    borderRadius: 0,
+                    border: '1px solid #222222',
+                    background: '#111111',
+                    color: '#ffffff',
+                    boxShadow: '0 15px 35px rgba(0, 0, 0, 0.5)'
+                }}
+            >
+                <Box sx={{ 
+                    p: 2, 
+                    borderBottom: '1px solid #222222',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)'
+                }}>
+                    <Typography 
+                        variant="h6" 
+                        sx={{ 
+                            fontWeight: 'bold',
+                            letterSpacing: '0.02em'
+                        }}
+                    >
+                        Sliced Files Preview
                     </Typography>
-                </Paper>
-            )}
-            <Paper elevation={3} sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                    Sliced Files Preview
-                </Typography>
-    
+                </Box>
+
                 {error && (
-                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                    <Alert 
+                        severity="error" 
+                        sx={{ 
+                            m: 2, 
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+                            color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                        }} 
+                        onClose={() => setError('')}
+                    >
                         {error}
                     </Alert>
                 )}
-    
-                <Grid container spacing={2}>
-                    <Grid item xs={12} md={8}>
-                        <PreviewContainer isLoading={isLoading}>
+
+                <Box sx={{ p: 2 }}>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} md={8}>
+
                             <Box 
-                                ref={mountRef} 
                                 sx={{ 
+                                    position: 'relative',
                                     height: 400,
                                     width: '100%',
-                                    border: '1px solid #eee',
-                                    borderRadius: 1,
-                                    overflow: 'hidden',
-                                    backgroundColor: '#f5f5f5'
-                                }} 
-                            />
-                            {!activePreview && !isLoading && (
-                                <Box sx={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                                }}>
-                                    <Typography variant="body1" color="text.secondary">
-                                        {slicingResult?.print_requests?.length > 0 
-                                            ? 'Loading preview...' 
-                                            : 'No preview available'}
-                                    </Typography>
-                                </Box>
-                            )}
-                        </PreviewContainer>
-                        {activePreview && (
-                            <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
-                                <Tooltip title="Reset View">
-                                    <Button 
-                                        size="small" 
-                                        onClick={handleResetView}
-                                        startIcon={<RotateLeftIcon />}
-                                    >
-                                        Reset View
-                                    </Button>
-                                </Tooltip>
+                                    border: '1px solid #222222',
+                                    borderRadius: 0,
+                                    backgroundColor: '#050505',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                {!webGLAvailable ? (
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        height: '100%',
+                                        p: 2,
+                                        textAlign: 'center',
+                                        color: '#aaaaaa'
+                                    }}>
+                                        <Typography variant="body1" color="#ffffff">
+                                            WebGL is not supported in your browser.<br />
+                                            3D preview requires WebGL support.
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    <PreviewContainer isLoading={isLoading}>
+                                        <Box 
+                                            ref={containerRef} 
+                                            sx={{ height: '100%', width: '100%' }} 
+                                        />
+                                        
+                                        {!activePreview && !isLoading && (
+                                            <Box sx={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                                zIndex: 5,
+                                            }}>
+                                                <Typography variant="body1" color="#aaaaaa">
+                                                    {printRequests.length > 0 
+                                                        ? 'Select a print request to view preview' 
+                                                        : 'No preview available'}
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                        
+                                        {previewRequestStatus.error && !isLoading && (
+                                            <Box sx={{
+                                                position: 'absolute',
+                                                bottom: 0,
+                                                left: 0,
+                                                right: 0,
+                                                p: 1,
+                                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                                zIndex: 5,
+                                            }}>
+                                                <Typography variant="body2" color="#ffffff">
+                                                    Failed to load preview: {previewRequestStatus.error}
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                    </PreviewContainer>
+                                )}
                             </Box>
-                        )}
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                        <Typography variant="subtitle2" gutterBottom>
-                            Print Requests
-                        </Typography>
-                        <Stack spacing={2} sx={{ maxHeight: 400, overflowY: 'auto', pr: 1 }}>
-                            {slicingResult?.print_requests?.map((request) => (
-                                <Card 
-                                    key={request.id}
-                                    variant="outlined"
-                                    sx={{ 
-                                        cursor: 'pointer',
-                                        bgcolor: selectedRequests.has(request.id) ? 'action.selected' : 'inherit',
-                                        border: activePreview?.id === request.id ? '2px solid #1976d2' : '1px solid rgba(0, 0, 0, 0.12)'
-                                    }}
-                                >
-                                   <CardContent onClick={() => handleRequestToggle(request)}>
-                                        <Typography variant="subtitle1">
-                                            {request.filaments?.[0]?.name || 'Unknown Material'}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Infill: {request.filling}% | Layer: {request.layer}mm
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Color: {request.filaments?.[0]?.color || 'Unknown'}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Material: {request.filaments?.[0]?.material || 'Unknown'}
-                                        </Typography> 
-                                    </CardContent>
-    
-                                    <CardActions>
+                            
+                            {activePreview && (
+                                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
+                                    <Tooltip title="Reset View">
                                         <Button 
                                             size="small" 
-                                            onClick={() => setActivePreview(request)}
-                                            variant={activePreview?.id === request.id ? "contained" : "text"}
+                                            onClick={handleResetView}
+                                            startIcon={<RotateLeftIcon />}
+                                            sx={{
+                                                color: '#aaaaaa',
+                                                '&:hover': {
+                                                    color: '#ffffff',
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                                }
+                                            }}
                                         >
-                                            {activePreview?.id === request.id ? "Viewing" : "Preview"}
+                                            Reset View
                                         </Button>
                                         <Button
                                             size="small"
@@ -781,51 +929,202 @@ const handlePrintStart = async (selectedRequestIds) => {
                                         >
                                             Download
                                         </Button>
-                                    </CardActions>
-                                </Card>
-                            ))}
-                            {(!slicingResult?.print_requests || slicingResult.print_requests.length === 0) && (
-                                <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
-                                    No print requests available
-                                </Typography>
+                                    </Tooltip>
+                                </Box>
+
                             )}
-                        </Stack>
+                        </Grid>
+                        
+                        <Grid item xs={12} md={4}>
+                            <Typography 
+                                variant="subtitle2" 
+                                gutterBottom
+                                sx={{ 
+                                    color: '#ffffff',
+                                    fontWeight: 600,
+                                    letterSpacing: '0.02em'
+                                }}
+                            >
+                                Print Requests
+                            </Typography>
+                            
+                            <Stack spacing={2} sx={{ maxHeight: 400, overflowY: 'auto', pr: 1 }}>
+                                {slicingResult?.print_requests?.map((request) => (
+                                    <Card 
+                                        key={request.id}
+                                        variant="outlined"
+                                        sx={{ 
+                                            cursor: 'pointer',
+                                            bgcolor: selectedRequests.has(request.id) ? 'rgba(255, 255, 255, 0.1)' : '#0a0a0a',
+                                            border: activePreview?.id === request.id ? '2px solid #ffffff' : '1px solid #333333',
+                                            borderRadius: 0,
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': {
+                                                borderColor: '#555555'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent 
+                                            onClick={() => handleRequestToggle(request)}
+                                            sx={{
+                                                p: 2,
+                                                '&:last-child': { pb: 2 },
+                                                color: '#ffffff'
+                                            }}
+                                        >
+                                            <Typography 
+                                                variant="subtitle1"
+                                                sx={{ 
+                                                    fontWeight: 600,
+                                                    color: '#ffffff'
+                                                }}
+                                            >
+                                                {request.filaments?.[0]?.name || 'Unknown Material'}
+                                            </Typography>
+                                            <Typography variant="body2" color="#aaaaaa">
+                                                Infill: {request.filling}% | Layer: {request.layer}mm
+                                            </Typography>
+                                            <Typography variant="body2" color="#aaaaaa">
+                                                Color: {request.filaments?.[0]?.color || 'Unknown'}
+                                            </Typography>
+                                            <Typography variant="body2" color="#aaaaaa">
+                                                Material: {request.filaments?.[0]?.material || 'Unknown'}
+                                            </Typography> 
+                                        </CardContent>
+
+                                        <CardActions sx={{ p: 1.5, borderTop: '1px solid #222222' }}>
+                                            <Button 
+                                                size="small" 
+                                                onClick={() => setActivePreview(request)}
+                                                variant={activePreview?.id === request.id ? "contained" : "outlined"}
+                                                sx={{
+                                                    borderRadius: 0,
+                                                    ...(activePreview?.id === request.id 
+                                                        ? {
+                                                            bgcolor: '#ffffff',
+                                                            color: '#000000',
+                                                            border: '1px solid #ffffff',
+                                                            '&:hover': {
+                                                                bgcolor: '#dddddd',
+                                                                color: '#000000'
+                                                            }
+                                                        } 
+                                                        : {
+                                                            color: '#aaaaaa',
+                                                            borderColor: '#555555',
+                                                            '&:hover': {
+                                                                borderColor: '#ffffff',
+                                                                color: '#ffffff'
+                                                            }
+                                                        }
+                                                    )
+                                                }}
+                                            >
+                                                {activePreview?.id === request.id ? "Viewing" : "Preview"}
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDownload(request);
+                                                }}
+                                                disabled={isDownloading}
+                                                startIcon={<DownloadIcon />}
+                                                sx={{
+                                                    color: '#aaaaaa',
+                                                    ml: 1,
+                                                    '&:hover': {
+                                                        color: '#ffffff',
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                                    },
+                                                    '&.Mui-disabled': {
+                                                        color: '#444444'
+                                                    }
+                                                }}
+                                            >
+                                                Download
+                                            </Button>
+                                        </CardActions>
+                                    </Card>
+                                ))}
+                                
+                                {(!slicingResult?.print_requests || slicingResult.print_requests.length === 0) && (
+                                    <Typography variant="body2" color="#aaaaaa" sx={{ p: 2, textAlign: 'center' }}>
+                                        No print requests available
+                                    </Typography>
+                                )}
+                            </Stack>
+                        </Grid>
                     </Grid>
-                </Grid>
-    
+                </Box>
+
                 {/* Pricing Summary */}
-                <Box sx={{ mt: 3 }}>
-                    <Divider sx={{ mb: 2 }} />
+                <Box sx={{ px: 2, pt: 2, pb: 3 }}>
+                    <Divider sx={{ mb: 2, borderColor: '#333333' }} />
                     <Grid container spacing={2}>
                         <Grid item xs={12} md={6}>
                             <Stack spacing={1}>
-                                <Typography variant="subtitle2">
+                                <Typography variant="subtitle2" color="#aaaaaa">
                                     Selected Items: {selectedRequests.size} of {slicingResult?.print_requests?.length || 0}
                                 </Typography>
-                                <Typography variant="h6" color="primary">
+                                <Typography 
+                                    variant="h6" 
+                                    color="#ffffff"
+                                    sx={{ fontWeight: 600 }}
+                                >
                                     Selected Total: {formatPrice(calculateSelectedPrice())}
                                 </Typography>
                             </Stack>
                         </Grid>
                         <Grid item xs={12} md={6}>
-                            <Stack spacing={1} sx={{ textAlign: 'right' }}>
-                                <Typography variant="subtitle2">
+                            <Stack spacing={1} sx={{ textAlign: {xs: 'left', md: 'right'} }}>
+                                <Typography variant="subtitle2" color="#aaaaaa">
                                     Project Summary
                                 </Typography>
-                                <Typography variant="h6">
+                                <Typography 
+                                    variant="h6"
+                                    color="#ffffff"
+                                    sx={{ fontWeight: 600 }}
+                                >
                                     Total Project Price: {formatPrice(getTotalPrice())}
                                 </Typography>
                             </Stack>
                         </Grid>
                     </Grid>
                 </Box>
-    
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
-                    <Stack direction="row" spacing={2}>
+
+                <Box 
+                    sx={{ 
+                        px: 2, 
+                        py: 3, 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        borderTop: '1px solid #222222',
+                        flexDirection: {xs: 'column', sm: 'row'},
+                        gap: 2,
+                        backgroundColor: 'rgba(0, 0, 0, 0.3)'
+                    }}
+                >
+                    <Stack 
+                        direction={{xs: 'column', sm: 'row'}} 
+                        spacing={2}
+                        sx={{ width: {xs: '100%', sm: 'auto'} }}
+                    >
                         <Button
                             variant="outlined"
                             onClick={onReset}
                             startIcon={<RotateLeftIcon />}
+                            sx={{
+                                border: '1px solid #555555',
+                                color: '#aaaaaa',
+                                borderRadius: 0,
+                                py: 1,
+                                '&:hover': {
+                                    borderColor: '#ffffff',
+                                    color: '#ffffff',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                }
+                            }}
                         >
                             Start Over
                         </Button>
@@ -834,6 +1133,21 @@ const handlePrintStart = async (selectedRequestIds) => {
                             onClick={handleSelectAll}
                             startIcon={<SelectAllIcon />}
                             disabled={!slicingResult?.print_requests?.length}
+                            sx={{
+                                border: '1px solid #555555',
+                                color: '#aaaaaa',
+                                borderRadius: 0,
+                                py: 1,
+                                '&:hover': {
+                                    borderColor: '#ffffff',
+                                    color: '#ffffff',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                },
+                                '&.Mui-disabled': {
+                                    borderColor: '#333333',
+                                    color: '#444444'
+                                }
+                            }}
                         >
                             {selectedRequests.size === slicingResult?.print_requests?.length ? 'Deselect All' : 'Select All'}
                         </Button>
@@ -848,6 +1162,32 @@ const handlePrintStart = async (selectedRequestIds) => {
                             variant="contained"
                             onClick={handleDownloadFiles}
                             disabled={selectedRequests.size === 0 || isDownloading}
+                            sx={{
+                                backgroundColor: 'transparent',
+                                border: '2px solid #ffffff',
+                                color: '#ffffff',
+                                borderRadius: 0,
+                                py: 1,
+                                fontWeight: 600,
+                                letterSpacing: '0.02em',
+                                transition: 'all 0.3s ease',
+                                boxShadow: 'none',
+                                width: {xs: '100%', sm: 'auto'},
+                                '&:hover': {
+                                    backgroundColor: '#ffffff',
+                                    color: '#000000',
+                                    boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
+                                    transform: 'translateY(-3px)'
+                                },
+                                '&.Mui-disabled': {
+                                    backgroundColor: 'transparent',
+                                    borderColor: '#333333',
+                                    color: '#444444'
+                                },
+                                '& .MuiLoadingButton-loadingIndicator': {
+                                    color: '#ffffff'
+                                }
+                            }}
                         >
                             {isDownloading ? 'Downloading...' : `Download Selected (${formatPrice(calculateSelectedPrice())})`}
                         </LoadingButton>
@@ -859,6 +1199,32 @@ const handlePrintStart = async (selectedRequestIds) => {
                             variant="contained"
                             onClick={() => handlePrintStart(Array.from(selectedRequests))}
                             disabled={selectedRequests.size === 0 || isLoading}
+                            sx={{
+                                backgroundColor: 'transparent',
+                                border: '2px solid #ffffff',
+                                color: '#ffffff',
+                                borderRadius: 0,
+                                py: 1,
+                                fontWeight: 600,
+                                letterSpacing: '0.02em',
+                                transition: 'all 0.3s ease',
+                                boxShadow: 'none',
+                                width: {xs: '100%', sm: 'auto'},
+                                '&:hover': {
+                                    backgroundColor: '#ffffff',
+                                    color: '#000000',
+                                    boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
+                                    transform: 'translateY(-3px)'
+                                },
+                                '&.Mui-disabled': {
+                                    backgroundColor: 'transparent',
+                                    borderColor: '#333333',
+                                    color: '#444444'
+                                },
+                                '& .MuiLoadingButton-loadingIndicator': {
+                                    color: '#ffffff'
+                                }
+                            }}
                         >
                             {isLoading ? 'Starting Print...' : `Print Selected (${formatPrice(calculateSelectedPrice())})`}
                         </LoadingButton>

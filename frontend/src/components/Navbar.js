@@ -10,7 +10,7 @@ const Navbar = ({ user, setUser }) => {
         try {
             await logout();
             setUser(null);
-            navigate('/Landing'); // Redirect to Landing Page after logout
+            window.location.href = '/Landing'; // Redirect to Landing Page after logout
         } catch (error) {
             console.error('Logout failed:', error);
         }
@@ -34,17 +34,26 @@ const Navbar = ({ user, setUser }) => {
                             sx={{ textTransform: 'none' }} // Prevent uppercase transformation
                         >
                             <Typography variant="body1">
-                                Welcome, {user.name}!
+                                {user.role === 'admin' ? "User Info" : `Welcome, ${user.name}!`}
                             </Typography>
                         </Button>
-                        {/* "Start Printing" button */}
-                        <Button
+                   
+
+                        {user.role === 'admin' && (
+                            <Button color="inherit" component={Link} to="/adminPrinter">
+                                Admin Printer
+                            </Button>
+                        )}
+
+     {/* "Start Printing" button */}
+     <Button
                             color="inherit"
                             component={Link}
                             to="/"
                         >
                             Start Printing
                         </Button>
+
                         {/* Logout button */}
                         <Button
                             color="inherit"

@@ -2,6 +2,33 @@ import React, { useState, useEffect } from 'react';
 import { getAllUsers, createUser, updateUserRole, deleteUser } from '../api/endpoints/authEndpoints';
 import { Container, Typography, Box, TextField, Button, Switch, FormControlLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar, Alert, CircularProgress } from '@mui/material';
 
+// Define our custom colors that will override any theme settings
+const CUSTOM_COLORS = {
+    admin: {
+        bg: 'salmon', // Purple
+        text: '#FFFFFF' // White
+    },
+    user: {
+        bg: '#9E9E9E', // Grey
+        text: '#FFFFFF' // White
+    },
+    delete: {
+        bg: 'red', // Red
+        text: '#FFFFFF' // White
+    },
+    makeAdmin: {
+         // White
+        text: '#ffffff', // Black
+        border: '#ffffff' // Purple border
+    },
+    removeAdmin: {
+      // White
+        text: 'white', // Orange
+        border: 'red' // Orange border
+    }
+    
+};
+
 const AdminInfo = () => {
     const [users, setUsers] = useState([]);
     const [newUser, setNewUser] = useState({
@@ -206,8 +233,12 @@ const AdminInfo = () => {
                     <Button 
                         type="submit" 
                         variant="contained" 
-                        color="primary"
-                        sx={{ mt: 1, alignSelf: 'flex-start' }}
+                        sx={{ 
+                            mt: 1, 
+                            alignSelf: 'flex-start', 
+                           
+                            '&:hover': { bgcolor: 'white' } 
+                        }}
                     >
                         Create User
                     </Button>
@@ -247,12 +278,14 @@ const AdminInfo = () => {
                                             <TableCell>{user.email}</TableCell>
                                             <TableCell>
                                                 <Box component="span" sx={{
-                                                    px: 1,
+                                                    px: 2,
                                                     py: 0.5,
                                                     borderRadius: 1,
-                                                    bgcolor: user.role === 'admin' ? 'primary.light' : 'success.light',
-                                                    color: 'white',
+                                                    bgcolor: user.role === 'admin' ? CUSTOM_COLORS.admin.bg : CUSTOM_COLORS.user.bg,
+                                                    color: user.role === 'admin' ? CUSTOM_COLORS.admin.text : CUSTOM_COLORS.user.text,
                                                     fontSize: '0.875rem',
+                                                    fontWeight: 'medium',
+                                                    textTransform: 'capitalize'
                                                 }}>
                                                     {user.role}
                                                 </Box>
@@ -262,16 +295,29 @@ const AdminInfo = () => {
                                                 <Button
                                                     variant="outlined"
                                                     size="small"
-                                                    color={user.role === 'admin' ? 'warning' : 'primary'}
+                                                    sx={{ 
+                                                        mr: 1, 
+                                                        bgcolor: CUSTOM_COLORS.makeAdmin.bg,
+                                                        color: user.role === 'admin' ? CUSTOM_COLORS.removeAdmin.text : CUSTOM_COLORS.makeAdmin.text,
+                                                        borderColor: user.role === 'admin' ? CUSTOM_COLORS.removeAdmin.border : CUSTOM_COLORS.makeAdmin.border,
+                                                        '&:hover': { 
+                                                            borderColor: user.role === 'admin' ? '#CC7A00' : '#7B1FA2',
+                                                            bgcolor: 'white',
+                                                            color: 'black'
+                                                        }
+                                                    }}
                                                     onClick={() => handleToggleRole(user.id, user.role)}
-                                                    sx={{ mr: 1 }}
                                                 >
                                                     {user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
                                                 </Button>
                                                 <Button
-                                                    variant="outlined"
+                                                    variant="contained"
                                                     size="small"
-                                                    color="error"
+                                                    sx={{ 
+                                                        bgcolor: CUSTOM_COLORS.delete.bg, 
+                                                        color: CUSTOM_COLORS.delete.text,
+                                                        '&:hover': { bgcolor: '#D32F2F' } 
+                                                    }}
                                                     onClick={() => handleDeleteUser(user.id)}
                                                 >
                                                     Delete

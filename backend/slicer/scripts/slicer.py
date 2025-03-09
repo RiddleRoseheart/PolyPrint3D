@@ -353,6 +353,11 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
     """Slices an STL to G-code using PrusaSlicer CLI with printer-specific settings."""
     prusa_path = "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe"
     
+    # Verify PrusaSlicer executable exists
+    if not os.path.exists(prusa_path):
+        print(f"ERROR: PrusaSlicer executable not found at {prusa_path}")
+        return False
+
     # Generate group identifier
     group_id = f"{printer.material.lower()}_{printer.color.lower()}"
     
@@ -360,46 +365,63 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
     remote_path, local_path = file_manager.get_job_file_paths(job_name, 'gcode', group_id)
     local_path = Path(local_path)
     
-    # Ensure output directory exists
+    # Ensure output directory exists with full permissions
     local_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Print out ALL paths for debugging
+    print(f"STL Path: {stl_path}")
+    print(f"Config Path: {config_path}")
+    print(f"Gcode Local Path: {local_path}")
+    print(f"Gcode Remote Path: {remote_path}")
 
     cmd = [
         prusa_path,
         str(stl_path),
-        "--load", config_path,
-        # Basic slicing command without profile specifications
+        "--load", str(config_path),
         "-g",  # Short form of --export-gcode
         "--output", str(local_path)
     ]
 
-    success = False
     try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print(f"Successfully sliced {stl_path} for printer {printer.id}")
+        # Add more detailed subprocess call
+        result = subprocess.run(
+            cmd, 
+            check=True, 
+            capture_output=True, 
+            text=True, 
+            timeout=300  # 5-minute timeout
+        )
+        
+        print("Subprocess output:", result.stdout)
+        print("Subprocess error output:", result.stderr)
 
-        # Upload to server if file exists and is not empty
+        # Verify file was actually created
         if local_path.exists() and local_path.stat().st_size > 0:
+            print(f"Successfully created G-code: {local_path}")
+            print(f"G-code file size: {local_path.stat().st_size} bytes")
+            
+            # Optional: Upload to server
             if file_manager.is_connected and remote_path:
                 with open(local_path, 'rb') as f:
                     file_manager.save_file(f.read(), remote_path)
                 print(f"G-code uploaded to server: {remote_path}")
-            success = True
+            
+            return True
         else:
-            print(f"Warning: G-code file not found or empty: {local_path}")
+            print(f"WARNING: G-code file not found or empty: {local_path}")
+            return False
 
     except subprocess.CalledProcessError as e:
-        print(f"Error slicing {stl_path}: {e}")
-        if e.output:
-            print("PrusaSlicer output:", e.output)
-        if e.stderr:
-            print("PrusaSlicer error:", e.stderr)
-    except FileNotFoundError:
-        print("PrusaSlicer executable not found at:", prusa_path)
+        print(f"Slicing Error: {e}")
+        print("Command Output:", e.output)
+        print("Command Error:", e.stderr)
+        return False
+    except subprocess.TimeoutExpired:
+        print("Slicing process timed out")
+        return False
     except Exception as e:
-        print(f"Error during slicing: {e}")
-
-    
-    return success, None
+        print(f"Unexpected error during slicing: {e}")
+        return False
 
 
 if __name__ == "__main__":
