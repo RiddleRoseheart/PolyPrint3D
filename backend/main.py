@@ -7,6 +7,7 @@ import sys
 from backend.database import init_db, db
 from flask_login import LoginManager 
 from flask_mail import Mail
+from flask_apscheduler import APScheduler
 from backend.utils.dev_data import create_test_data
 from backend.database.models import User
 from dotenv import load_dotenv
@@ -19,6 +20,8 @@ sys.path.insert(0, project_root)
 # Initialize extensions
 login_manager = LoginManager() 
 mail = Mail() 
+
+scheduler = APScheduler()
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +47,15 @@ def create_app():
             "allow_headers": ["Content-Type", "Authorization"],
         }
     }, supports_credentials=True)
+    
+    # Initialize scheduler
+    scheduler.init_app(app)
+    scheduler.start()
+    
+    # Add the job to check for completed prints every 5 minutes
+    from backend.services.octoprint_service import check_completed_prints
+    scheduler.add_job(id='check_completed_prints', func=check_completed_prints, 
+                     trigger='interval', minutes=5)
     
     #initialize extensions
     #init_oauth(app)
@@ -83,12 +95,12 @@ def create_app():
     
     app.config['OCTOPRINT_TIMEOUT'] = 10
    
-# Configure Flask-Mail TODO .ENV!! & in production
+    # Configure Flask-Mail TODO .ENV!! & in production
     app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
     app.config['MAIL_PORT'] = 2525
     app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', 'f20c04086a57e8')
-    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', 'c3d5822dd84d40')
+    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', 'bf1c074e065169')
+    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', '6c4747ce660666')
     mail.init_app(app)
 
     app.config['FILE_MANAGER_USERNAME'] = 'local_user'  

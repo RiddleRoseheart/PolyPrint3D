@@ -10,7 +10,8 @@ from backend.database.models import PrintRequest, UploadedFile
 import uuid
 from backend.database import db
 from backend.slicer.config.material_config import MaterialConfig
-from backend.database.models import Printer
+from backend.database.models import Printer 
+from backend.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('slicer', __name__)
@@ -112,7 +113,12 @@ def get_print_requests():
         JSON with print requests list
     """
     try:
+        logger.info(f"Fetching print requests for user: {current_user.id}")
+
         requests = slicer_service.get_user_print_requests(current_user)
+        
+        logger.info(f"Found {len(requests)} print requests")
+        
         return ResponseBuilder.success({
             'print_requests': [ResponseBuilder.create_print_request_response(pr) for pr in requests]
         })
@@ -162,6 +168,57 @@ def cleanup_print_request(request_id: str):
         logger.error(f"Cleanup error: {str(e)}")
         return ResponseBuilder.error('Cleanup failed', 500)
     
+@bp.route('/api/slicer/requests/<request_id>/status', methods=['GET'])
+@login_required
+def get_print_status(request_id: str):
+    """
+    Get the current status of a print request
+    
+    Args:
+        request_id: ID of the print request
+        
+    Returns:
+        JSON with status information
+    """
+    
+    try:
+        print_request = slicer_service.get_print_request(request_id, current_user)
+        
+        if not print_request:
+            return ResponseBuilder.error('Print request not found or access denied', 404)
+            
+        # Get the current printer status if the print is being processed
+        job_status = None
+        printer_status = None
+        
+        if print_request.printer_id and print_request.state in ['printing', 'processing']:
+            # Get current status from printer via OctoPrint API
+            job_status, printer_status = slicer_service.get_printer_job_status(print_request)
+            
+            # If job has completed according to printer, update our database
+            if job_status and job_status.get('state') == 'completed' and print_request.state != 'completed':
+                old_state = print_request.state
+                print_request.state = 'completed'
+                db.session.commit()
+                
+                # Send completion notification email
+                logger.info(f"Print job {request_id} marked as completed, sending notification")
+                slicer_service.notification_service.send_print_completed_notification(print_request)
+                
+        # Build response with current status information
+        response = ResponseBuilder.create_print_request_response(print_request)
+        
+        # Add job status information if available
+        if job_status:
+            response['job_info'] = job_status
+        if printer_status:
+            response['printer_info'] = printer_status
+            
+        return ResponseBuilder.success(response)
+        
+    except Exception as e:
+        logger.error(f"Error getting print status: {str(e)}")
+        return ResponseBuilder.error(f"Failed to get print status: {str(e)}", 500)
 
 @bp.route('/api/slicer/materials', methods=['GET'])
 @login_required
@@ -284,3 +341,93 @@ def send_to_printer(request_id: str):
     except Exception as e:
         logger.error(f"Error sending print job to printer: {str(e)}")
         return ResponseBuilder.error("Server error while sending print job to printer", 500)
+    
+
+@bp.route('/api/slicer/check-completed-prints', methods=['POST'])
+@login_required
+def manual_check_completed_prints():
+    """Manual trigger to check completed prints (for testing/development)"""
+    # Import UserRole
+    from backend.database.models import UserRole
+    
+    if current_user.role != UserRole.ADMIN.value:
+        return ResponseBuilder.error("Admin access required", 403)
+        
+    try:
+        # Find all print requests that are currently printing
+        printing_requests = PrintRequest.query.filter_by(state='printing').all()
+        
+        if not printing_requests:
+            return ResponseBuilder.success({'message': 'No active print jobs to check'})
+        
+        from backend.services.octoprint_service import OctoPrintService
+        octoprint_service = OctoPrintService()
+        
+        updated_count = 0  # Initialize the counter
+        for print_request in printing_requests:
+            if not print_request.printer_id:
+                continue
+                
+            printer = print_request.printer
+            if not printer:
+                continue
+                
+            try:
+                # Get job status from OctoPrint
+                job_info = octoprint_service.get_job_status(printer)
+                
+                # Check if print is complete
+                is_complete = False
+                
+                # OctoPrint might report "Finished" or have 100% completion
+                if job_info:
+                    if job_info.get('state') == 'Finished':
+                        is_complete = True
+                    elif job_info.get('progress', {}).get('completion', 0) >= 100:
+                        is_complete = True
+                
+                if is_complete:
+                    print_request.state = 'completed'
+                    db.session.commit()
+                    
+                    # Send completion notification email
+                    logger.info(f"Print job {print_request.id} marked as completed, sending notification")
+                    slicer_service.notification_service.send_print_completed_notification(print_request)
+                    
+                    updated_count += 1
+            except Exception as job_e:
+                logger.error(f"Error checking job {print_request.id}: {str(job_e)}")
+        
+        return ResponseBuilder.success({
+            'message': f'Checked {len(printing_requests)} print jobs, updated {updated_count}'
+        })
+    except Exception as e:
+        logger.error(f"Error checking completed prints: {str(e)}")
+        return ResponseBuilder.error(f"Failed to check completed prints: {str(e)}", 500)
+    
+@bp.route('/api/slicer/test-notification/<request_id>', methods=['POST'])
+@login_required
+def test_notification(request_id: str):
+    """Test endpoint to send a notification for a specific print request"""
+    from backend.database.models import UserRole
+    
+    if current_user.role != UserRole.ADMIN.value:
+        return ResponseBuilder.error("Admin access required", 403)
+        
+    try:
+        print_request = PrintRequest.query.get(request_id)
+        
+        if not print_request:
+            return ResponseBuilder.error("Print request not found", 404)
+            
+        # Force send notification regardless of status
+        result = slicer_service.notification_service.send_print_completed_notification(print_request)
+        
+        if result:
+            return ResponseBuilder.success({"message": "Test notification sent successfully"})
+        else:
+            return ResponseBuilder.error("Failed to send test notification", 500)
+            
+    except Exception as e:
+        logger.error(f"Error sending test notification: {str(e)}")
+        return ResponseBuilder.error(f"Failed to send test notification: {str(e)}", 500)
