@@ -1,8 +1,7 @@
 from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
-from backend.routes import file_routes, slicer_routes, auth_routes, printer_routes, alert_routes
+from backend.routes import file_routes, slicer_routes, auth_routes, printer_routes, alert_routes, config_routes
 from pathlib import Path
-
 import os
 import sys
 from backend.database import init_db, db
@@ -11,7 +10,6 @@ from flask_mail import Mail
 from flask_apscheduler import APScheduler
 from backend.utils.dev_data import create_test_data
 from backend.database.models import User
-from backend.routes.octoprint_routes import bp as octoprint_bp
 from dotenv import load_dotenv
 
 
@@ -39,20 +37,6 @@ def init_login_manager(app):
     def unauthorized():
         return jsonify({'error': 'Unauthorized'}), 401
 
-def check_printer_data(app):
-    """Debug function to check printer data in database"""
-    with app.app_context():
-        from backend.database.models import Printer
-        printers = Printer.query.all()
-        print("\nPrinters in database:")
-        for p in printers:
-            print(f"ID: {p.id}")
-            print(f"Name: {p.name}")
-            print(f"Status: {p.status}")
-            print(f"Available: {p.is_available}")
-            print(f"Material: {p.material}")
-            print(f"Color: {p.color}")
-            print("---")
 
 def create_app():
     app = Flask(__name__)
@@ -138,8 +122,9 @@ def create_app():
     app.register_blueprint(slicer_routes.bp)
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(printer_routes.bp)
-    #app.register_blueprint(octoprint_routes.bp)
     app.register_blueprint(alert_routes.bp)
+    app.register_blueprint(config_routes.bp)
+    
 
     @app.route('/')
     def serve():
