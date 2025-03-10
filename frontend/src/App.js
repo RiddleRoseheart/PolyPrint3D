@@ -29,6 +29,8 @@ import AdminInfo from './components/AdminInfo';
 import StarsBackground from './components/StarsBackground'; // Import the new component
 import { getCurrentUser } from './api/endpoints/authEndpoints';
 
+import { checkLocalMode } from './api/endpoints/configEndpoints';
+
 // Create a custom theme with monochrome black and white styling
 const theme = createTheme({
   palette: {
@@ -235,9 +237,6 @@ const theme = createTheme({
     },
   },
 });
-
-import { checkLocalMode } from './api/endpoints/configEndpoints';
-
 
 const STEPS = [
   'Upload STL File',
@@ -506,6 +505,7 @@ function App() {
                                         position: 'relative',
                                         zIndex: 1
                                     }}
+                                    >
 
                                  {/* Display local mode banner if active */}
                                  {isLocalMode && <LocalModeBanner />}
@@ -535,6 +535,7 @@ function App() {
                                             </Typography>
                                         )}
                                     </Box>
+                                    </Stepper>
 
                                     <Stepper 
                                         activeStep={getActiveStep()} 

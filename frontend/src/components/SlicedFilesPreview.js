@@ -90,7 +90,7 @@ const isWebGLAvailable = () => {
  * @param {boolean} props.isOfflineMode - Whether the app is in offline mode
  * @returns {JSX.Element} Sliced files preview component
  */
-const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart, isLocalMode }) => {
+const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart, isLocalMode, request }) => {
     const [selectedSlices, setSelectedSlices] = useState(new Set());
     const [selectedRequests, setSelectedRequests] = useState(new Set());
     const [activePreview, setActivePreview] = useState(null);
@@ -921,13 +921,6 @@ const handlePrintStart = async (selectedRequestIds) => {
                                             }}
                                         >
                                             Reset View
-                                        </Button>
-                                        <Button
-                                            size="small"
-                                            onClick={() => handleDownload(request)}
-                                            disabled={isLoading}
-                                        >
-                                            Download
                                         </Button>
                                     </Tooltip>
                                 </Box>

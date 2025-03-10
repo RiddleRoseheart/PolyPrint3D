@@ -230,98 +230,65 @@ class OctoPrintService:
             self.logger.error(f"Error pausing print job: {str(e)}")
             return False
 
-    def resume_print_job(self, printer: Printer) -> bool:
+    def check_completed_prints(self): 
         """
-        Resume the paused print job
-        
-        Args:
-            printer: Printer model object
-            
-        Returns:
-            bool indicating success
+        Check for completed print jobs and send notifications
+        This should be called periodically by a scheduler
         """
-        try:
-            url = f"http://{printer.ip_address}/api/job"
-            headers = self._get_headers(printer.api_key)
-            
-            data = {
-                "command": "pause",
-                "action": "resume"
-            }
-            
-            response = requests.post(url, headers=headers, json=data)
-            
-            if response.status_code in (200, 204):
-                self.logger.info(f"Successfully resumed print job on printer {printer.name}")
-                return True
-            else:
-                self.logger.error(f"Failed to resume print job: {response.status_code} - {response.text}")
-                return False
-              
-    except Exception as e:
-        self.logger.error(f"Error resuming print job: {str(e)}")
-        return False
-    
-def check_completed_prints():
-    """
-    Check for completed print jobs and send notifications
-    This should be called periodically by a scheduler
-    """
-    from backend.main import app, db
+        from backend.main import app, db
 
-    with app.app_context():  # Needed for database operations in scheduled tasks
-        try:
-            # Find all print requests that are currently printing
-            printing_requests = PrintRequest.query.filter_by(state='printing').all()
-            
-            if not printing_requests:
-                logger.info('No active print jobs to check')
-                return
-            
-            from backend.services.octoprint_service import OctoPrintService
-            octoprint_service = OctoPrintService()
-            
-            updated_count = 0
-            for print_request in printing_requests:
-                if not print_request.printer_id:
-                    continue
-                    
-                printer = print_request.printer
-                if not printer:
-                    continue
-                    
-                try:
-                    # Get job status from OctoPrint
-                    job_info = octoprint_service.get_job_status(printer)
-                    
-                    # Check if print is complete
-                    is_complete = False
-                    
-                    # OctoPrint might report "Finished" or have 100% completion
-                    if job_info:
-                        if job_info.get('state') == 'Finished':
-                            is_complete = True
-                        elif job_info.get('progress', {}).get('completion', 0) >= 100:
-                            is_complete = True
-                    
-                    if is_complete:
-                        print_request.state = 'completed'
-                        db.session.commit()
+        with app.app_context():  # Needed for database operations in scheduled tasks
+            try:
+                # Find all print requests that are currently printing
+                printing_requests = PrintRequest.query.filter_by(state='printing').all()
+                
+                if not printing_requests:
+                    logger.info('No active print jobs to check')
+                    return
+                
+                from backend.services.octoprint_service import OctoPrintService
+                octoprint_service = OctoPrintService()
+                
+                updated_count = 0
+                for print_request in printing_requests:
+                    if not print_request.printer_id:
+                        continue
                         
-                        # Send completion notification email
-                        logger.info(f"Print job {print_request.id} marked as completed, sending notification")
+                    printer = print_request.printer
+                    if not printer:
+                        continue
                         
-                        # Get notification service
-                        from backend.services.notification_service import NotificationService
-                        notification_service = NotificationService(app.extensions.get('mail'))
-                        notification_service.send_print_completed_notification(print_request)
+                    try:
+                        # Get job status from OctoPrint
+                        job_info = octoprint_service.get_job_status(printer)
                         
-                        updated_count += 1
-                except Exception as job_e:
-                    logger.error(f"Error checking job {print_request.id}: {str(job_e)}")
-            
-            logger.info(f'Checked {len(printing_requests)} print jobs, updated {updated_count}')
-            
-        except Exception as e:
-            logger.error(f"Error checking completed prints: {str(e)}")
-
+                        # Check if print is complete
+                        is_complete = False
+                        
+                        # OctoPrint might report "Finished" or have 100% completion
+                        if job_info:
+                            if job_info.get('state') == 'Finished':
+                                is_complete = True
+                            elif job_info.get('progress', {}).get('completion', 0) >= 100:
+                                is_complete = True
+                        
+                        if is_complete:
+                            print_request.state = 'completed'
+                            db.session.commit()
+                            
+                            # Send completion notification email
+                            logger.info(f"Print job {print_request.id} marked as completed, sending notification")
+                            
+                            # Get notification service
+                            from backend.services.notification_service import NotificationService
+                            notification_service = NotificationService(app.extensions.get('mail'))
+                            notification_service.send_print_completed_notification(print_request)
+                            
+                            updated_count += 1
+                    except Exception as job_e:
+                        logger.error(f"Error checking job {print_request.id}: {str(job_e)}")
+                
+                logger.info(f'Checked {len(printing_requests)} print jobs, updated {updated_count}')
+                
+            except Exception as e:
+                logger.error(f"Error checking completed prints: {str(e)}")

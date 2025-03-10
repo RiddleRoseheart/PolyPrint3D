@@ -11,6 +11,7 @@ from flask_apscheduler import APScheduler
 from backend.utils.dev_data import create_test_data
 from backend.database.models import User
 from dotenv import load_dotenv
+from backend.services.octoprint_service import OctoPrintService
 
 
 # Add the project root to the Python path
@@ -53,10 +54,11 @@ def create_app():
     scheduler.start()
     
     # Add the job to check for completed prints every 5 minutes
-    from backend.services.octoprint_service import check_completed_prints
-    scheduler.add_job(id='check_completed_prints', func=check_completed_prints, 
-                     trigger='interval', minutes=5)
-    
+    scheduler.add_job(id='check_completed_prints', 
+                    func=OctoPrintService().check_completed_prints, 
+                    trigger='interval', 
+                    minutes=5)
+
     #initialize extensions
     #init_oauth(app)
     init_login_manager(app)
@@ -136,5 +138,4 @@ app = create_app()
 
 if __name__ == '__main__':
     app.run(debug=True)
-   
    

@@ -1,4 +1,4 @@
-//TODO te testen
+//TODO te testen PLUS FROTNEND ADAPTEREN
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Box, 
@@ -12,14 +12,9 @@ import {
     Alert,
     Button,
     Tooltip,
-    Fade,
-    Zoom,
     IconButton,
-    Divider,
-    ThemeProvider,
-    createTheme,
-    CssBaseline
     Avatar,
+    Divider,
     Chip
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
@@ -28,79 +23,6 @@ import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import StopIcon from '@mui/icons-material/Stop';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import CloseIcon from '@mui/icons-material/Close';
-
-// Create a monochrome theme
-const theme = createTheme({
-  components: {
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          boxShadow: '0 15px 35px rgba(0, 0, 0, 0.5) !important',
-          borderWidth: '1px !important',
-          borderStyle: 'solid !important',
-          borderColor: '#222222 !important',
-          borderRadius: '0 !important',
-        }
-      }
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          boxShadow: '0 15px 35px rgba(0, 0, 0, 0.5) !important',
-          borderWidth: '1px !important',
-          borderStyle: 'solid !important',
-          borderColor: '#222222 !important',
-          borderRadius: '0 !important',
-        }
-      }
-    },
-    MuiCardContent: {
-      styleOverrides: {
-        root: {
-          padding: '24px !important',
-        }
-      }
-    },
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: '0 !important',
-          padding: '10px 16px !important',
-          boxShadow: 'none !important',
-        }
-      }
-    }
-  },
-  typography: {
-    fontFamily: '"Inter", "Roboto", sans-serif',
-    h4: {
-      fontWeight: 900,
-      letterSpacing: '-0.02em',
-    },
-    h6: {
-      fontWeight: 700,
-      letterSpacing: '0.02em',
-    }
-  },
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#ffffff',
-      light: '#ffffff',
-      dark: '#aaaaaa',
-    },
-    background: {
-      default: '#000000',
-      paper: '#111111',
-    },
-    text: {
-      primary: '#ffffff',
-      secondary: '#aaaaaa',
-    }
-  }
-});
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { 
     getJobStatus, 
@@ -120,71 +42,6 @@ const PrintMonitor = () => {
     const [error, setError] = useState('');
     const [refreshTimers, setRefreshTimers] = useState({});
 
-    // Use some sample files if none are provided
-    const files = selectedFiles || [
-        { name: 'Print_1.stl', material: 'PLA', quality: '0.2mm', infill: '20%' },
-        { name: 'Print_2.stl', material: 'PETG', quality: '0.15mm', infill: '30%' },
-        { name: 'Print_3.stl', material: 'ABS', quality: '0.1mm', infill: '50%' }
-    ];
-
-    // Initialize print jobs with settings
-
-    const initializePrintJobs = useCallback(() => {
-        const jobs = files.map((file, index) => ({
-            id: `print_${Date.now()}_${index}`,
-            fileName: file.name || `Print_${index + 1}.stl`,
-            printer: `Printer ${(index % 3) + 1}`,
-            status: 'PRINTING',
-            progress: Math.floor(Math.random() * 30), // Start at different progress points
-            isPaused: false,
-            estimatedTime: 30 + (Math.random() * 30),
-            timeRemaining: 30,
-            startTime: new Date(),
-            printVariables: {
-                material: file.material || 'PLA',
-                quality: file.quality || '0.2mm',
-                infill: file.infill || '20%',
-                temperature: '200°C',
-                bedTemp: '60°C'
-            }
-        }));
-
-        setPrintJobs(jobs);
-    }, [files]);
-
-
-    // Update progress for active prints
-    const updateJobProgress = useCallback(async () => {
-        try {
-            const updatedJobs = await Promise.all(printJobs.map(async (job) => {
-                if (job.status === 'COMPLETED' || !job.printerIp || !job.printerApiKey) return job;
-
-                // Skip update if paused to avoid resetting the status
-                if (job.isPaused) return job;
-
-                try {
-                    const jobDetails = await getPrintJobDetails(job.printerIp, job.printerApiKey);
-                    const newProgress = jobDetails.completion || 0;
-                    const newStatus = newProgress >= 100 ? 'COMPLETED' : jobDetails.state;
-                    const newTimeRemaining = jobDetails.printTimeLeft / 60 || 0; // Convert seconds to minutes
-
-                    if (newProgress >= 100 && job.progress < 100) {
-                        addNotification(`Print completed: ${job.fileName}`);
-                    }
-
-                    return {
-                        ...job,
-                        progress: newProgress,
-                        status: newStatus,
-                        timeRemaining: newTimeRemaining
-                    };
-                } catch (error) {
-                    console.error(`Error updating job ${job.id}:`, error);
-                    return job;
-                }
-            }));
-
-            setPrintJobs(updatedJobs);
     // Fetch user's active print jobs
     const fetchUserPrintJobs = useCallback(async () => {
         setLoading(true);
@@ -342,17 +199,6 @@ const PrintMonitor = () => {
         }, ...prev].slice(0, DISPLAY_NOTIFICATIONS));
     };
 
-    // Clear notifications
-    const clearNotifications = () => {
-        setNotifications([]);
-    };
-
-    // Format time display
-    const formatTimeRemaining = (minutes) => {
-        if (minutes < 1) return 'Less than a minute';
-        return `${Math.round(minutes)} minutes`;
-    };
-          
     // Get color based on job state
     const getStateColor = (state) => {
         switch (state) {
@@ -430,341 +276,240 @@ const PrintMonitor = () => {
         });
     };
 
-
     return (
-        <ThemeProvider theme={theme}>
-            <CssBaseline />
-            {/* Main Container */}
-            <Box sx={{ 
-                maxWidth: 1200, 
-                mt: 4, 
-                bgcolor: '#000000',
-                border: '1px solid rgb(61, 61, 61)',
-                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-                overflow: 'hidden',
-                p: 4
-            }}>
-                {/* Header */}
-                <Fade in={true} timeout={500}>
-                    <Stack 
-                        direction={{ xs: 'column', sm: 'row' }} 
-                        justifyContent="space-between" 
-                        alignItems={{ xs: 'stretch', sm: 'center' }} 
-                        sx={{ 
-                            mb: 4, 
-                            bgcolor: '#111111', 
-                            p: 3, 
-                            border: '1px solid #222222',
-                        }}
-                    >
-                        <Typography 
-                            variant="h4" 
-                            sx={{ 
-                                fontWeight: 900, 
-                                color: '#ffffff',
-                                mb: { xs: 2, sm: 0 },
-                                letterSpacing: '-0.02em',
-                            }}
-                        >
-                            Printing Progress
-                        </Typography>
-                        <Button
-                            variant="outlined"
-                            onClick={onReset}
-                            startIcon={<RestartAltIcon />}
-                            sx={{
-                                border: '2px solid white',
-                                color: 'white',
-                                padding: '12px 24px !important',
-                                fontSize: '1rem',
-                                fontWeight: 'bold',
-                                letterSpacing: '0.05em',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                    backgroundColor: 'white',
-                                    color: 'black',
-                                    borderColor: 'white',
-                                    transform: 'translateY(-3px)',
-                                    boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3) !important'
-                                }
-                            }}
-                        >
-                            START OVER
-                        </Button>
-                    </Stack>
-                </Fade>
+        <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                <Typography variant="h4">
+                    My Print Jobs
+                </Typography>
+                <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    onClick={fetchUserPrintJobs}
+                >
+                    Refresh All
+                </Button>
+            </Stack>
 
-                {/* Print Jobs Grid */}
-                <Grid container spacing={3}>
-                    {printJobs.map((job) => (
-                        <Grid item xs={12} sm={6} md={4} key={job.id}>
-                            <Zoom in={true} style={{ transitionDelay: `${job.id.split('_')[2] * 100}ms` }}>
-                                <Card
-                                    sx={{
-                                        border: '2px solid rgb(255, 254, 254) !important',
-                                        background: '#111111',
-                                        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                                        '&:hover': {
-                                            transform: 'translateY(-5px)',
-                                            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5) !important',
-                                            borderColor: '#333333 !important'
-                                        }
-                                    }}
-                                >
-                                    <CardContent sx={{ p: 3}}>
-                                        {/* File Name and Printer */}
-                                        <Box sx={{ 
-                                            mb: 3, 
-                                            bgcolor: '#0a0a0a', 
-                                            p: 2, 
-                                            border: '1px solid #222222',
-                                        }}>
-                                            <Typography 
-                                                variant="h6" 
-                                                gutterBottom 
-                                                sx={{ 
-                                                    fontWeight: 'bold', 
-                                                    color: '#ffffff',
-                                                    fontSize: '1.25rem',
-                                                    letterSpacing: '0.02em'
-                                                }}
-                                            >
-                                                {job.fileName}
-                                            </Typography>
-                                            <Typography 
-                                                sx={{ 
-                                                    fontSize: '1rem',
-                                                    color: '#aaaaaa',
-                                                    fontWeight: 300,
-                                                    letterSpacing: '0.02em'
-                                                }}
-                                            >
-                                                {job.printer}
-                                            </Typography>
-                                        </Box>
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+                    {error}
+                </Alert>
+            )}
 
-                                        {/* Progress Bar */}
-                                        <Box sx={{ 
-                                            mb: 3,
-                                            p: 2,
-                                            bgcolor: '#0a0a0a',
-                                            border: '1px solid #222222',
-                                        }}>
-                                            <LinearProgress 
-                                                variant="determinate" 
-                                                value={job.progress} 
-                                                sx={{
-                                                    height: 16,
-                                                    mb: 2,
-                                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                                    '& .MuiLinearProgress-bar': {
-                                                        backgroundColor: '#ffffff'
-                                                    }
-                                                }}
-                                            />
-                                            
-                                            {/* Status and Progress Percentage */}
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                                <Typography 
-                                                    sx={{ 
-                                                        display: 'flex', 
-                                                        alignItems: 'center', 
-                                                        gap: 1, 
-                                                        fontWeight: 600,
-                                                        fontSize: '0.95rem',
-                                                        color: '#ffffff'
-                                                    }}
-                                                >
-                                                    {job.status === 'COMPLETED' ? <CheckCircleIcon /> : <PrintIcon />}
-                                                    {job.status}
-                                                    {job.isPaused && ' (Paused)'}
-                                                </Typography>
-                                                <Typography sx={{ 
-                                                    fontWeight: 'bold', 
-                                                    color: '#ffffff',
-                                                    fontSize: '1.2rem'
-                                                }}>
-                                                    {job.progress}%
-                                                </Typography>
-                                            </Stack>
-                                        </Box>
-
-                                        {/* Pause/Resume Button */}
-                                        {job.status !== 'COMPLETED' && (
-                                            <Box sx={{ mb: 3 }}>
-                                                <Button
-                                                    fullWidth
-                                                    variant="outlined"
-                                                    onClick={() => togglePauseJob(job.id)}
-                                                    startIcon={job.isPaused ? <PlayCircleIcon /> : <PauseCircleIcon />}
-                                                    sx={{ 
-                                                        p: '14px !important',
-                                                        border: '2px solid white',
-                                                        color: 'white',
-                                                        fontWeight: 600,
-                                                        letterSpacing: '0.05em',
-                                                        transition: 'all 0.3s ease',
-                                                        '&:hover': {
-                                                            backgroundColor: 'white',
-                                                            color: 'black',
-                                                            borderColor: 'white',
-                                                            transform: 'translateY(-3px)',
-                                                            boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3) !important'
-                                                        }
-                                                    }}
-                                                >
-                                                    {job.isPaused ? 'RESUME PRINT' : 'PAUSE PRINT'}
-                                                </Button>
-                                            </Box>
-                                        )}
-
-                                        {/* Time Remaining */}
-                                        {job.status === 'PRINTING' && !job.isPaused && (
-                                            <Box sx={{ 
-                                                mb: 3,
-                                                p: 2,
-                                                bgcolor: '#0a0a0a',
-                                                border: '1px solid #222222',
-                                                textAlign: 'center'
-                                            }}>
-                                                <Typography variant="subtitle1" sx={{ fontWeight: 300, color: '#aaaaaa' }}>
-                                                    Time remaining:
-                                                </Typography>
-                                                <Typography variant="h6" sx={{ fontWeight: 600, color: '#ffffff' }}>
-                                                    {formatTimeRemaining(job.timeRemaining)}
-                                                </Typography>
-                                            </Box>
-                                        )}
-
-                                        {/* Print Settings */}
-                                        <Paper elevation={0} sx={{ 
-                                            p: 3, 
-                                            border: '1px solid #222222 !important',
-                                            backgroundColor: '#0a0a0a'
-                                        }}>
-                                            <Typography 
-                                                variant="subtitle1" 
-                                                sx={{ 
-                                                    fontWeight: 600, 
-                                                    color: '#ffffff', 
-                                                    mb: 2,
-                                                    borderBottom: '1px solid #333333',
-                                                    pb: 1,
-                                                    letterSpacing: '0.02em'
-                                                }}
-                                            >
-                                                Print Settings:
-                                            </Typography>
-                                            {Object.entries(job.printVariables).map(([key, value]) => (
-                                                <Box 
-                                                    key={key} 
-                                                    sx={{ 
-                                                        display: 'flex', 
-                                                        justifyContent: 'space-between', 
-                                                        mb: 1.5,
-                                                        pb: 1,
-                                                        borderBottom: '1px solid #222222'
-                                                    }}
-                                                >
-                                                    <Typography 
-                                                        variant="body1" 
-                                                        sx={{ color: '#aaaaaa', fontWeight: 300 }}
-                                                    >
-                                                        {key}:
-                                                    </Typography>
-                                                    <Typography 
-                                                        variant="body1" 
-                                                        sx={{ color: '#ffffff', fontWeight: 500 }}
-                                                    >
-                                                        {value}
-                                                    </Typography>
-                                                </Box>
-                                            ))}
-                                        </Paper>
-                                    </CardContent>
-                                </Card>
-                            </Zoom>
-                        </Grid>
-                    ))}
-                </Grid>
-
-                {/* Notifications */}
-                {notifications.length > 0 && (
-                    <Fade in={true} timeout={500}>
-                        <Paper 
-                            elevation={0}
-                            sx={{ 
-                                mt: 4, 
-                                p: 3,
-                                background: '#111111',
-                                border: '1px solid #222222 !important',
-                            }}
-                        >
-                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                                <Typography 
-                                    variant="h6" 
-                                    sx={{ 
-                                        fontWeight: 600, 
-                                        color: '#ffffff',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        letterSpacing: '0.02em'
-                                    }}
-                                >
-                                    <NotificationsIcon sx={{ mr: 1, fontSize: '1.5rem' }} />
-                                    Notifications
-                                </Typography>
-                                <IconButton 
-                                    onClick={clearNotifications} 
-                                    size="small"
-                                    sx={{
-                                        color: '#aaaaaa',
-                                        bgcolor: 'rgba(255, 255, 255, 0.05)',
-                                        border: '1px solid #333333',
-                                        '&:hover': {
-                                            bgcolor: 'rgba(255, 255, 255, 0.1)',
-                                            color: '#ffffff'
-                                        }
-                                    }}
-                                >
-                                    <CloseIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                            <Divider sx={{ mb: 2, borderColor: '#333333' }} />
-                            <Stack spacing={2}>
-                                {notifications.slice(0, DISPLAY_NOTIFICATIONS).map(notification => (
-                                    <Alert 
-                                        key={notification.id} 
-                                        severity="success"
+            {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                    <LinearProgress sx={{ width: '100%' }} />
+                </Box>
+            ) : (
+                <>
+                    {printJobs.length === 0 ? (
+                        <Paper sx={{ p: 4, textAlign: 'center' }}>
+                            <PrintIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+                            <Typography variant="h6" gutterBottom>
+                                No active print jobs
+                            </Typography>
+                            <Typography variant="body1" color="text.secondary">
+                                You don't have any active print jobs at the moment.
+                            </Typography>
+                        </Paper>
+                    ) : (
+                        <Grid container spacing={3}>
+                            {printJobs.map(job => (
+                                <Grid item xs={12} md={6} key={job.id}>
+                                    <Card 
+                                        variant="outlined" 
                                         sx={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center',
-                                            padding: '12px 16px !important',
-                                            border: '1px solid rgba(255, 255, 255, 0.2) !important',
-                                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                                            fontSize: '1rem',
-                                            color: '#ffffff',
-                                            '& .MuiAlert-icon': {
-                                                color: '#ffffff'
-                                            }
+                                            position: 'relative',
+                                            borderColor: job.state === 'printing' ? 'info.main' : 
+                                                      job.state === 'paused' ? 'warning.main' : 'inherit',
+                                            borderWidth: (job.state === 'printing' || job.state === 'paused') ? 2 : 1
                                         }}
                                     >
-                                        <Typography variant="body1" sx={{ fontWeight: 400, color: '#ffffff' }}>
-                                            {notification.message}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ ml: 2, color: '#aaaaaa', fontWeight: 300 }}>
-
+                                        {refreshTimers[job.id] && (
+                                            <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />
+                                        )}
+                                        
+                                        <CardContent>
+                                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                                <Stack direction="row" spacing={1} alignItems="center">
+                                                    <Avatar 
+                                                        sx={{ 
+                                                            bgcolor: getStateColor(job.state) + '.light',
+                                                            color: getStateColor(job.state) + '.dark',
+                                                            width: 32,
+                                                            height: 32
+                                                        }}
+                                                    >
+                                                        <PrintIcon />
+                                                    </Avatar>
+                                                    <Typography variant="h6">
+                                                        {formatFileName(job.file_path)}
+                                                    </Typography>
+                                                </Stack>
+                                                <Chip 
+                                                    label={job.state || 'Unknown'} 
+                                                    color={getStateColor(job.state)}
+                                                    size="small"
+                                                    sx={{ textTransform: 'capitalize' }}
+                                                />
+                                            </Stack>
+                                            
+                                            {/* Print details */}
+                                            <Box sx={{ mt: 2 }}>
+                                                <Grid container spacing={1}>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Material
+                                                        </Typography>
+                                                        <Typography variant="body2" fontWeight="medium">
+                                                            {job.filaments?.[0]?.material || 'Unknown'}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Color
+                                                        </Typography>
+                                                        <Typography variant="body2" fontWeight="medium">
+                                                            {job.filaments?.[0]?.color || 'Unknown'}
+                                                        </Typography>
+                                                    </Grid>
+                                                </Grid>
+                                                
+                                                <Divider sx={{ my: 1.5 }} />
+                                                
+                                                {(job.state === 'printing' || job.state === 'paused') && job.jobInfo && (
+                                                    <>
+                                                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                                                            <Typography variant="body2">
+                                                                {Math.round(job.jobInfo.progress?.completion || 0)}%
+                                                            </Typography>
+                                                            <Typography variant="body2">
+                                                                Est. finish: {getEstimatedCompletion(job)}
+                                                            </Typography>
+                                                        </Stack>
+                                                        
+                                                        <LinearProgress 
+                                                            variant="determinate" 
+                                                            value={job.jobInfo.progress?.completion || 0} 
+                                                            sx={{ height: 8, borderRadius: 1 }}
+                                                        />
+                                                        
+                                                        <Grid container spacing={1} sx={{ mt: 1 }}>
+                                                            <Grid item xs={6}>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    Time Remaining
+                                                                </Typography>
+                                                                <Typography variant="body2" fontWeight="medium">
+                                                                    {formatTimeHoursMinutes(job.jobInfo.progress?.printTimeLeft)}
+                                                                </Typography>
+                                                            </Grid>
+                                                            <Grid item xs={6}>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    Elapsed Time
+                                                                </Typography>
+                                                                <Typography variant="body2" fontWeight="medium">
+                                                                    {formatTimeHoursMinutes(job.jobInfo.progress?.printTime)}
+                                                                </Typography>
+                                                            </Grid>
+                                                        </Grid>
+                                                    </>
+                                                )}
+                                                
+                                                {(job.state !== 'printing' && job.state !== 'paused') && (
+                                                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            {job.state === 'completed' ? 'Print job completed successfully!' : 
+                                                             job.state === 'cancelled' ? 'Print job was cancelled' : 
+                                                             job.state === 'error' ? 'Print job encountered an error' : 
+                                                             'Print job is pending'}
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        </CardContent>
+                                        
+                                        {(job.state === 'printing' || job.state === 'paused') && (
+                                            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between' }}>
+                                                <Tooltip title="Refresh Status">
+                                                    <IconButton
+                                                        onClick={() => handleRefreshJob(job.id)}
+                                                        disabled={refreshTimers[job.id]}
+                                                    >
+                                                        <RefreshIcon />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                
+                                                <Box>
+                                                    {job.state === 'printing' ? (
+                                                        <Tooltip title="Pause Print">
+                                                            <Button
+                                                                variant="contained"
+                                                                color="warning"
+                                                                startIcon={<PauseCircleIcon />}
+                                                                onClick={() => handlePauseJob(job.id)}
+                                                                sx={{ mr: 1 }}
+                                                            >
+                                                                Pause
+                                                            </Button>
+                                                        </Tooltip>
+                                                    ) : (
+                                                        <Tooltip title="Resume Print">
+                                                            <Button
+                                                                variant="contained"
+                                                                color="primary"
+                                                                startIcon={<PlayCircleIcon />}
+                                                                onClick={() => handleResumeJob(job.id)}
+                                                                sx={{ mr: 1 }}
+                                                            >
+                                                                Resume
+                                                            </Button>
+                                                        </Tooltip>
+                                                    )}
+                                                    
+                                                    <Tooltip title="Cancel Print">
+                                                        <Button
+                                                            variant="outlined"
+                                                            color="error"
+                                                            startIcon={<StopIcon />}
+                                                            onClick={() => handleCancelJob(job.id)}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </Tooltip>
+                                                </Box>
+                                            </Box>
+                                        )}
+                                    </Card>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    )}
+                    
+                    {notifications.length > 0 && (
+                        <Paper sx={{ mt: 3, p: 2 }}>
+                            <Typography variant="h6" gutterBottom>
+                                Notifications
+                            </Typography>
+                            <Stack spacing={1}>
+                                {notifications.map(notification => (
+                                    <Alert 
+                                        key={notification.id} 
+                                        severity="info"
+                                        sx={{ display: 'flex', alignItems: 'center' }}
+                                    >
+                                        {notification.message}
+                                        <Typography variant="caption" sx={{ ml: 2 }}>
                                             {notification.timestamp.toLocaleTimeString()}
                                         </Typography>
                                     </Alert>
                                 ))}
                             </Stack>
                         </Paper>
-                    </Fade>
-                )}
-            </Box>
-        </ThemeProvider>
-
+                    )}
+                </>
+            )}
+        </Box>
     );
 };
 
