@@ -13,7 +13,6 @@ from backend.database.models import User
 from dotenv import load_dotenv
 from backend.services.octoprint_service import OctoPrintService
 
-
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
@@ -21,7 +20,6 @@ sys.path.insert(0, project_root)
 # Initialize extensions
 login_manager = LoginManager() 
 mail = Mail() 
-
 scheduler = APScheduler()
 
 # Load environment variables
@@ -38,12 +36,14 @@ def init_login_manager(app):
     def unauthorized():
         return jsonify({'error': 'Unauthorized'}), 401
 
-
 def create_app():
     app = Flask(__name__)
+    
+    # Configure CORS from environment variables
+    origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',')
     CORS(app, resources={
         r"/api/*": {
-            "origins": ["http://localhost:3000"],
+            "origins": origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
         }
@@ -53,61 +53,51 @@ def create_app():
     scheduler.init_app(app)
     scheduler.start()
     
-    # Add the job to check for completed prints every 5 minutes
-    scheduler.add_job(id='check_completed_prints', 
-                    func=OctoPrintService().check_completed_prints, 
-                    trigger='interval', 
-                    minutes=5)
+    # Add the job to check for completed prints
+    scheduler.add_job(
+        id='check_completed_prints', 
+        func=OctoPrintService().check_completed_prints, 
+        trigger='interval', 
+        minutes=int(os.environ.get('PRINT_CHECK_INTERVAL', '5'))
+    )
 
-    #initialize extensions
-    #init_oauth(app)
+    # Initialize extensions
     init_login_manager(app)
     init_db(app)
     
-    # Configure app
-    app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
+    # Configure app 
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-secret-key-for-development')
     
-    # Configure Flask-Mail
-    app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
-    app.config['MAIL_PORT'] = 2525
-    app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', 'f20c04086a57e8')
-    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', 'c3d5822dd84d40')
+    # Configure Flask-Mail 
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
+    app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
+    app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER')
+    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD')
     mail.init_app(app)
     
     # Create database tables
     with app.app_context():
         db.create_all()
-        create_test_data() #TODO
+        if os.environ.get('FLASK_ENV') == 'development':
+            create_test_data()
     
-    # Configure upload folder
-    app.config['UPLOAD_FOLDER'] = Path(os.path.abspath('uploads'))
-    app.config['OUTPUT_FOLDER'] = Path('backend/output')
-    app.config['CONFIG_PATH'] = Path('backend/slicer/config/config.ini')
+    # Configure file paths 
+    app.config['UPLOAD_FOLDER'] = Path(os.environ.get('UPLOAD_FOLDER', 'uploads'))
+    app.config['OUTPUT_FOLDER'] = Path(os.environ.get('OUTPUT_FOLDER', 'backend/output'))
+    app.config['CONFIG_PATH'] = Path(os.environ.get('CONFIG_PATH', 'backend/slicer/config/config.ini'))
 
     # Ensure directories exist
     app.config['UPLOAD_FOLDER'].mkdir(parents=True, exist_ok=True)
     app.config['OUTPUT_FOLDER'].mkdir(parents=True, exist_ok=True)
 
-#TODO 
-    # Configure app
-    app.config['SECRET_KEY'] = 'your-secret-key'  # TODO
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///polyprint.db'
-    
-    app.config['OCTOPRINT_TIMEOUT'] = 10
+    # OctoPrint configuration
+    app.config['OCTOPRINT_TIMEOUT'] = int(os.environ.get('OCTOPRINT_TIMEOUT', '10'))
    
-    # Configure Flask-Mail TODO .ENV!! & in production
-    app.config['MAIL_SERVER'] = 'sandbox.smtp.mailtrap.io'
-    app.config['MAIL_PORT'] = 2525
-    app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', 'bf1c074e065169')
-    app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASSWORD', '6c4747ce660666')
-    mail.init_app(app)
-
-    app.config['FILE_MANAGER_USERNAME'] = 'local_user'  
-    app.config['FILE_MANAGER_PASSWORD'] = 'password'    
-    app.config['FILE_MANAGER_REMOTE_PATH'] = '/remote'
+    # File manager configuration
+    app.config['FILE_MANAGER_USERNAME'] = os.environ.get('FILE_MANAGER_USERNAME')
+    app.config['FILE_MANAGER_PASSWORD'] = os.environ.get('FILE_MANAGER_PASSWORD')
+    app.config['FILE_MANAGER_REMOTE_PATH'] = os.environ.get('FILE_MANAGER_REMOTE_PATH', '/remote')
 
     # Handle database reset
     if "--reset-db" in sys.argv:
@@ -127,7 +117,6 @@ def create_app():
     app.register_blueprint(alert_routes.bp)
     app.register_blueprint(config_routes.bp)
     
-
     @app.route('/')
     def serve():
         return send_from_directory('../frontend/', 'index.html')
@@ -137,5 +126,5 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(debug=True)
-   
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(debug=debug_mode)
