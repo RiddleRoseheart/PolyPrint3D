@@ -331,26 +331,31 @@ function App() {
     };
 
     const LocalModeBanner = () => (
-        <Paper 
-            elevation={0}
-            sx={{
-                backgroundColor: '#fff3cd',
-                color: '#856404',
-                p: 2,
-                mb: 3,
-                borderRadius: 1,
-                border: '1px solid #ffeeba',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-            }}
-        >
-            <Typography variant="body1">
-                <strong>Network Connection Mode:</strong> You are not on the same network as the printers. 
-                Direct printing is unavailable, but you can download files for manual printing.
-            </Typography>
-        </Paper>
-    );
+      <Paper 
+          elevation={0}
+          sx={{
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              color: '#E0CFFF', // Light lavender-white text
+              p: 2,
+              mb: 3,
+              borderRadius: 1,
+              border: '2px solid',
+              borderImageSource: 'linear-gradient(45deg, #4A90E2, #8E44AD)', // Blue to purple gradient border
+              borderImageSlice: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              fontWeight: 'bold'
+          }}
+      >
+          <Typography variant="body1">
+              <strong>Network Connection Mode:</strong> You are not on the same network as the printers. 
+              Direct printing is unavailable, but you can download files for manual printing.
+          </Typography>
+      </Paper>
+  );
+
 
     // Show loading spinner while checking auth status
     if (appState.isLoading) {
