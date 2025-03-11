@@ -23,8 +23,8 @@ import Landing from './components/Landing';
 import AuthPage from './components/authPage';
 import Navbar from './components/Navbar';
 import PrinterAdmin from './components/Admin/PrinterAdmin';
+import AdminPanel from './components/Admin/AdminPanel';
 import UserProfile from './components/UserProfile';
-
 import AdminInfo from './components/AdminInfo';
 import StarsBackground from './components/StarsBackground'; // Import the new component
 import { getCurrentUser } from './api/endpoints/authEndpoints';
@@ -458,10 +458,10 @@ function App() {
                     
                     {/* Admin route - protected */}
                     <Route 
-                        path="/admin" 
+                        path="/admin-panel" 
                         element={
                             <ProtectedAdminRoute>
-                                <AdminInfo />
+                                <AdminPanel />
                             </ProtectedAdminRoute>
                         } 
                     />
