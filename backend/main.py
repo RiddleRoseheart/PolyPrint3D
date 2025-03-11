@@ -83,7 +83,7 @@ def create_app():
             create_test_data()
     
     # Configure file paths 
-    app.config['UPLOAD_FOLDER'] = Path(os.environ.get('UPLOAD_FOLDER', 'uploads'))
+    app.config['UPLOAD_FOLDER'] = Path(os.path.abspath(os.environ.get('UPLOAD_FOLDER', os.path.join(project_root, 'uploads'))))
     app.config['OUTPUT_FOLDER'] = Path(os.environ.get('OUTPUT_FOLDER', 'backend/output'))
     app.config['CONFIG_PATH'] = Path(os.environ.get('CONFIG_PATH', 'backend/slicer/config/config.ini'))
 

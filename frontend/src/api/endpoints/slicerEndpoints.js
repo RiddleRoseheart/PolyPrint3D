@@ -78,17 +78,30 @@ export const deletePrintRequest = async (requestId) => {
  * @param {string} materialId - Optional material ID to filter by
  * @returns {Promise<Object>} Colors and their hex codes
  */
-export const getColors = async (materialId = null) => {
+// Modified getColors function in slicerEndpoints.js
+export const getColors = async (materialId = null, printerId = null, showUnavailable = true) => {
     try {
         let url = '/api/slicer/colors';
+        const params = [];
+        
         if (materialId) {
-            url += `?material_id=${materialId}`;
+            params.push(`material_id=${materialId}`);
         }
+        
+        if (printerId) {
+            params.push(`printer_id=${printerId}`);
+        }
+        
+        if (params.length > 0) {
+            url += '?' + params.join('&');
+        }
+        
         const response = await axiosInstance.get(url);
         return processResponse(response.data);
     } catch (error) {
         handleError(error);
-        return {}; }
+        return {}; 
+    }
 };
 
 /**

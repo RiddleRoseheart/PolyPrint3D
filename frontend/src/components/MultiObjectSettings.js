@@ -11,10 +11,12 @@ import {
     MenuItem, 
     Select,
     Stack,
-    Grid
+    Grid,
+    Tooltip
 } from '@mui/material';
 import ObjectPreview from './ObjectPreview';
 import { getColors, getMaterials } from '../api/endpoints/slicerEndpoints';
+import { getAllPrinters } from '../api/endpoints/printerEndpoints';
 /**
  * Component for individual object settings card
  * @param {Object} props
@@ -25,9 +27,9 @@ import { getColors, getMaterials } from '../api/endpoints/slicerEndpoints';
  * @param {Function} props.onChange - Change handler for object properties
  * @returns {JSX.Element} Object settings card component
  */
-const ObjectSettingsCard = ({ object, index, materials, colors, onChange, onMaterialChange }) => {
+const ObjectSettingsCard = ({ object, index, materials, colors, onChange, onMaterialChange, unavailableColors }) => {
     // Get hex color for the preview
-    const hexColor = colors[object.color] || '#00FF00';
+    const hexColor = colors[object.color] || unavailableColors[object.color] || '#00FF00';
     
     // Handle material change
     const handleMaterialChange = (e) => {
@@ -92,23 +94,66 @@ const ObjectSettingsCard = ({ object, index, materials, colors, onChange, onMate
                             label="Color"
                             onChange={(e) => onChange(index, 'color', e.target.value)}
                         >
-                                        {Object.keys(colors).map(color => (
-                                <MenuItem key={color} value={color} sx={{ display: 'flex', alignItems: 'center' }}>
-                                    <Box 
-                                        component="span" 
-                                        sx={{ 
-                                            display: 'inline-block', 
-                                            width: 16, 
-                                            height: 16, 
-                                            bgcolor: colors[color],
-                                            mr: 1,
-                                            border: '1px solid white',
-                                            borderRadius: '2px'
-                                        }} 
-                                        />
-                                        {color}
-                                    </MenuItem>
+                                       
+                                     {/* Available Colors */}
+                                     {Object.keys(colors).map(color => (
+                                            <MenuItem key={color} value={color} sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <Box 
+                                                    component="span" 
+                                                    sx={{ 
+                                                        display: 'inline-block', 
+                                                        width: 16, 
+                                                        height: 16, 
+                                                        bgcolor: colors[color],
+                                                        mr: 1,
+                                                        border: '1px solid #ccc',
+                                                        borderRadius: '2px'
+                                                    }} 
+                                                />
+                                                {color}
+                                            </MenuItem>
                                 ))}
+
+{/* Unavailable Colors */}
+{Object.keys(unavailableColors).length > 0 && (
+                                            <MenuItem disabled sx={{ 
+                                                opacity: 1, 
+                                                color: '#666', 
+                                                fontWeight: 'bold',
+                                                pointerEvents: 'none'
+                                            }}>
+                                                Currently Unavailable Colors
+                                            </MenuItem>
+                                        )}
+                                        
+                                        {Object.keys(unavailableColors).map(color => (
+                                            <Tooltip title="Printer with this color is currently busy" arrow>
+                                                <MenuItem 
+                                                    key={`unavailable-${color}`} 
+                                                    value={color} 
+                                                    sx={{ 
+                                                        display: 'flex', 
+                                                        alignItems: 'center',
+                                                        opacity: 0.7
+                                                    }}
+                                                >
+                                                    <Box 
+                                                        component="span" 
+                                                        sx={{ 
+                                                            display: 'inline-block', 
+                                                            width: 16, 
+                                                            height: 16, 
+                                                            bgcolor: `rgba(${hexToRgb(unavailableColors[color])}, 0.5)`,
+                                                            mr: 1,
+                                                            border: '1px solid #ccc',
+                                                            borderRadius: '2px'
+                                                        }} 
+                                                    />
+                                                    {color} (Busy)
+                                                </MenuItem>
+                                            </Tooltip>
+                                        ))}
+
                             </Select>
                                 </FormControl>
                             </Grid>
@@ -118,6 +163,19 @@ const ObjectSettingsCard = ({ object, index, materials, colors, onChange, onMate
             </Grid>
         </Card>
     );
+};
+
+// Helper function to convert hex to RGB
+const hexToRgb = (hex) => {
+    const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+        return r + r + g + g + b + b;
+    });
+    
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? 
+        `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : 
+        '0, 0, 0';
 };
 
 /**
@@ -132,47 +190,129 @@ const ObjectSettingsCard = ({ object, index, materials, colors, onChange, onMate
 const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors: globalColors, setColors }) => {
     // New state for object-specific colors
     const [objectColors, setObjectColors] = useState({});
+    const [objectUnavailableColors, setObjectUnavailableColors] = useState({});
+    const [printerStatus, setPrinterStatus] = useState({});
+
+// Fetch printer status
+useEffect(() => {
+    const fetchPrinterStatus = async () => {
+        try {
+            const response = await getAllPrinters();
+            if (response && response.printers) {
+                const status = {};
+                
+                response.printers.forEach(printer => {
+                    status[printer.id] = {
+                        isAvailable: printer.is_available && 
+                                     printer.status !== 'printing' && 
+                                     printer.status !== 'paused' && 
+                                     printer.status !== 'cancelling',
+                        material: printer.material,
+                        color: printer.color
+                    };
+                });
+                
+                setPrinterStatus(status);
+            }
+        } catch (error) {
+            console.error('Error fetching printer status:', error);
+        }
+    };
     
-    // Initialize object colors
-    useEffect(() => {
-        const initialObjectColors = {};
-        objects.forEach((obj, index) => {
-            initialObjectColors[index] = globalColors;
-        });
-        setObjectColors(initialObjectColors);
+    fetchPrinterStatus();
+   
+        // Poll for updates every 30 seconds
+        const intervalId = setInterval(fetchPrinterStatus, 30000);
+        return () => clearInterval(intervalId);
     }, []);
+
+
+   // Initialize object colors
+   useEffect(() => {
+    const initialObjectColors = {};
+    const initialUnavailableColors = {};
     
+    objects.forEach((_, index) => {
+        initialObjectColors[index] = globalColors;
+        initialUnavailableColors[index] = {};
+    });
+    
+    setObjectColors(initialObjectColors);
+    setObjectUnavailableColors(initialUnavailableColors);
+}, [objects, globalColors]);
+
     // Get colors for a specific object
     const getColorsForObject = (index) => {
         return objectColors[index] || globalColors;
     };
     
+     // Get unavailable colors for a specific object
+     const getUnavailableColorsForObject = (index) => {
+        return objectUnavailableColors[index] || {};
+    };
+
     // Handle material change for a specific object
     const handleMaterialChange = async (index, materialName) => {
         try {
             console.log(`Fetching colors for object ${index}, material: ${materialName}`);
             
-            // Get the material ID from the materials object
+            // Get material ID
             const materialInfo = materials[materialName];
             const materialId = materialInfo?.id;
             
             if (materialId) {
-                const materialColors = await getColors(materialId);
+                // Get all colors for this material
+                const allColorsResponse = await getColors(materialId);
+                const allColors = allColorsResponse || {};
                 
-                // Only update colors for this specific object
+                // Filter by printer availability
+                const availableColors = {};
+                const unavailableColors = {};
+                
+                // Check each color if it's available on any printer with the selected material
+                Object.entries(allColors).forEach(([colorName, colorHex]) => {
+                    // Check if any printer with this color+material is available
+                    const hasAvailablePrinter = Object.values(printerStatus).some(printer => 
+                        printer.isAvailable && 
+                        printer.material === materialName && 
+                        printer.color === colorName
+                    );
+                    
+                    // Check if this color+material exists on any printer (even if busy)
+                    const existsOnAnyPrinter = Object.values(printerStatus).some(printer => 
+                        printer.material === materialName && 
+                        printer.color === colorName
+                    );
+                    
+                    if (hasAvailablePrinter) {
+                        availableColors[colorName] = colorHex;
+                    } else if (existsOnAnyPrinter) {
+                        unavailableColors[colorName] = colorHex;
+                    }
+                });
+                
+                // Update colors for this specific object
                 setObjectColors(prev => ({
                     ...prev,
-                    [index]: materialColors
+                    [index]: availableColors
                 }));
                 
-                // Update object's color if current color isn't available in new material
-                const updatedObjects = [...objects];
-                const availableColors = Object.keys(materialColors);
+                setObjectUnavailableColors(prev => ({
+                    ...prev,
+                    [index]: unavailableColors
+                }));
                 
-                if (availableColors.length > 0 && !availableColors.includes(updatedObjects[index].color)) {
+                // Update object's color if current color isn't available anymore
+                const updatedObjects = [...objects];
+                const availableColorNames = Object.keys(availableColors);
+                
+                if (availableColorNames.length > 0 && 
+                    !availableColorNames.includes(updatedObjects[index].color) &&
+                    !Object.keys(unavailableColors).includes(updatedObjects[index].color)) {
+                    // Set to first available color if current one isn't available or unavailable
                     updatedObjects[index] = {
                         ...updatedObjects[index],
-                        color: availableColors[0]
+                        color: availableColorNames[0]
                     };
                     onObjectsChange(updatedObjects);
                 }
@@ -211,18 +351,51 @@ const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors: glob
             const materialId = materialInfo?.id;
             
             if (materialId) {
-                const newColors = await getColors(materialId);
-                setColors(newColors);
+                // Get all colors for this material
+                const allColorsResponse = await getColors(materialId);
+                const allColors = allColorsResponse || {};
                 
-                // Reset object-specific colors to use global colors
-                const resetObjectColors = {};
-                objects.forEach((_, index) => {
-                    resetObjectColors[index] = newColors;
+                // Filter by printer availability
+                const availableColors = {};
+                const unavailableColors = {};
+                
+                Object.entries(allColors).forEach(([colorName, colorHex]) => {
+                    const hasAvailablePrinter = Object.values(printerStatus).some(printer => 
+                        printer.isAvailable && 
+                        printer.material === value && 
+                        printer.color === colorName
+                    );
+                    
+                    const existsOnAnyPrinter = Object.values(printerStatus).some(printer => 
+                        printer.material === value && 
+                        printer.color === colorName
+                    );
+                    
+                    if (hasAvailablePrinter) {
+                        availableColors[colorName] = colorHex;
+                    } else if (existsOnAnyPrinter) {
+                        unavailableColors[colorName] = colorHex;
+                    }
                 });
+                
+                // Update global colors
+                setColors(availableColors);
+                
+                // Reset object-specific colors
+                const resetObjectColors = {};
+                const resetUnavailableColors = {};
+                
+                objects.forEach((_, idx) => {
+                    resetObjectColors[idx] = availableColors;
+                    resetUnavailableColors[idx] = unavailableColors;
+                });
+                
                 setObjectColors(resetObjectColors);
+                setObjectUnavailableColors(resetUnavailableColors);
             }
         }
     };
+
 
     return (
         <Box border='1px solid rgb(222, 222, 222)'>
@@ -291,15 +464,17 @@ const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors: glob
             
             <Divider sx={{ my: 2 }} />
             
-            {/* Object cards with object-specific colors */}
-            {objects.map((object, index) => (
+           {/* Object cards with availability status */}
+           {objects.map((object, index) => (
                 <ObjectSettingsCard
                     key={index}
                     object={object}
                     index={index}
                     materials={materials}
                     colors={getColorsForObject(index)}
+                    unavailableColors={getUnavailableColorsForObject(index)}
                     onChange={handleObjectChange}
+                    onMaterialChange={(material) => handleMaterialChange(index, material)}
                 />
             ))}
             
@@ -312,4 +487,5 @@ const MultiObjectSettings = ({ objects, onObjectsChange, materials, colors: glob
         </Box>
     );
 };
+
 export default MultiObjectSettings;
