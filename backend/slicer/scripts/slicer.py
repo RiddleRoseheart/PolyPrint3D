@@ -72,27 +72,33 @@ def get_available_printers_from_service():
         
         raise ValueError("No available printers found in the database")
 
+import gc
+import trimesh
+
 def split_disconnected_components(mesh):
     """
     Split mesh into naturally disconnected components without cutting through objects.
     Only separates objects that are physically disconnected from each other.
-
     
     Parameters:
     - mesh: trimesh object
     
-
     Returns:
     - list of trimesh objects
     """
-    # Use trimesh's built-in split function with only_watertight=False to preserve non-watertight parts
     components = mesh.split(only_watertight=False)
-
-   
-    # Filter out invalid components (those with too few vertices)
-    valid_components = [comp for comp in components if len(comp.vertices) >= 4]
-   
-
+    
+    valid_components = []
+    batch_size = 10
+    
+    for i in range(0, len(components), batch_size):
+        batch = components[i:i+batch_size]
+        for comp in batch:
+            if len(comp.vertices) >= 4:
+                valid_components.append(comp)
+        del batch
+        gc.collect()
+    
     return valid_components
 
 def check_object_fits(obj, build_volume):
