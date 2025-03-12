@@ -454,7 +454,10 @@ class SlicerService:
         try:
             # Initialize AlertService
             from backend.services.alert_service import AlertService, AlertType
+            from backend.services.printer_queue_service import PrinterQueueService
+
             alert_service = AlertService()
+            printer_queue_service = PrinterQueueService()
             
             # Verify print request and access
             print_request = self.get_print_request(request_id, user)
@@ -508,7 +511,7 @@ class SlicerService:
                 return False
             
             self.logger.info(f"Found G-code file at {gcode_path}")
-                
+
             # Upload G-code file to printer
             try:
                 import requests
@@ -573,36 +576,30 @@ class SlicerService:
                         'X-Api-Key': printer.api_key
                     }
                     
-                    # Send the request with a timeout
-                    self.logger.info(f"Sending file upload request to {url}")
-                    response = requests.post(url, files=files, data=data, headers=headers, timeout=30)
+                    # Send the request to the printer queue
+                    self.logger.info(f"Adding print request {request_id} to printer queue")
+                    queue_result = printer_queue_service.add_to_queue(print_request)
                     
-                    self.logger.info(f"Upload response status: {response.status_code}")
-                    self.logger.info(f"Upload response body: {response.text}")
-                    
-                    if response.status_code in (200, 201):
-                        self.logger.info(f"Successfully sent print job {request_id} to printer {printer.name}")
-                        
-                        # Update print request status
-                        print_request.state = "printing"
-                        db.session.commit()
-                        
-                        # Create success alert
-                        alert_service.create_alert(
-                            title=f"Print Started: {file_name}",
-                            message=f"Print job successfully started on printer {printer.name}",
-                            alert_type=AlertType.SUCCESS,
-                            user_id=user.id,
-                            source="Printer",
-                            source_id=printer.id
-                        )
+                    if queue_result:
+                        self.logger.info(f"Successfully queued print job {request_id} for printer {printer.name}")
+
+                        # Create success alert only if this was not already done in the queue service
+                        if print_request.state == "printing":
+                            alert_service.create_alert(
+                                title=f"Print Started: {os.path.basename(gcode_path)}",
+                                message=f"Print job successfully started on printer {printer.name}",
+                                alert_type=AlertType.SUCCESS,
+                                user_id=user.id,
+                                source="Printer",
+                                source_id=printer.id
+                            )
                         
                         return True
                     else:
-                        self.logger.error(f"Failed to upload G-code: {response.status_code} - {response.text}")
+                        self.logger.error(f"Failed to queue print job {request_id}")
                         alert_service.create_alert(
-                            title="Print Upload Failed",
-                            message=f"Failed to upload G-code file to printer {printer.name}. Error: {response.status_code}",
+                            title="Print Queue Failed",
+                            message=f"Failed to add print job to queue for printer {printer.name}",
                             alert_type=AlertType.ERROR,
                             user_id=user.id,
                             source="Printer",
