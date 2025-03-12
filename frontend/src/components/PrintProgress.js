@@ -1,5 +1,5 @@
+//TODO te testen
 import React, { useState, useEffect, useCallback } from 'react';
-import { getPrintJobDetails, pausePrintJob, resumePrintJob } from '../api/octoprintAPI';
 import { 
     Box, 
     Paper, 
@@ -19,11 +19,14 @@ import {
     ThemeProvider,
     createTheme,
     CssBaseline
+    Avatar,
+    Chip
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import StopIcon from '@mui/icons-material/Stop';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import CloseIcon from '@mui/icons-material/Close';
@@ -98,13 +101,24 @@ const theme = createTheme({
     }
   }
 });
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { 
+    getJobStatus, 
+    pausePrintJob, 
+    resumePrintJob, 
+    cancelPrintJob 
+} from '../api/endpoints/printerEndpoints';
+import axiosInstance from '../api/axiosConfig';
 
-const POLLING_INTERVAL = 5000; // Poll every 5 seconds
+const POLLING_INTERVAL = 10000; // Poll every 10 seconds
 const DISPLAY_NOTIFICATIONS = 5; // Number of notifications to show
 
-const PrintingProgress = ({ selectedFiles, onReset }) => {
+const PrintMonitor = () => {
     const [printJobs, setPrintJobs] = useState([]);
     const [notifications, setNotifications] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [refreshTimers, setRefreshTimers] = useState({});
 
     // Use some sample files if none are provided
     const files = selectedFiles || [
@@ -171,61 +185,161 @@ const PrintingProgress = ({ selectedFiles, onReset }) => {
             }));
 
             setPrintJobs(updatedJobs);
-        } catch (error) {
-            console.error('Error updating job progress:', error);
-        }
-    }, [printJobs]);
-
-    // Initialize jobs on component mount
-    useEffect(() => {
-        initializePrintJobs();
-    }, [initializePrintJobs]);
-
-    // Progress update interval
-    useEffect(() => {
-        const interval = setInterval(updateJobProgress, POLLING_INTERVAL);
-        return () => clearInterval(interval);
-    }, [updateJobProgress]);
-
-    // Handle individual print pause/resume
-    const togglePauseJob = async (job) => {
-        if (!job.printerIp || !job.printerApiKey) {
-            addNotification(`Cannot control ${job.fileName}: No printer connection details`);
-            return;
-        }
-
+    // Fetch user's active print jobs
+    const fetchUserPrintJobs = useCallback(async () => {
+        setLoading(true);
         try {
-            if (job.isPaused) {
-                await resumePrintJob(job.printerIp, job.printerApiKey);
-                addNotification(`Resumed: ${job.fileName}`);
-            } else {
-                await pausePrintJob(job.printerIp, job.printerApiKey);
-                addNotification(`Paused: ${job.fileName}`);
+            const response = await axiosInstance.get('/api/user/print-jobs');
+            
+            if (response?.data?.data) {
+                const jobsWithDetails = await Promise.all(
+                    response.data.data.map(async (job) => {
+                        try {
+                            // Get detailed status if job is printing
+                            if (job.state === 'printing') {
+                                const statusData = await getJobStatus(job.id);
+                                return {
+                                    ...job,
+                                    jobInfo: statusData.data,
+                                    isPaused: job.state === 'paused'
+                                };
+                            }
+                            return {
+                                ...job,
+                                isPaused: job.state === 'paused'
+                            };
+                        } catch (error) {
+                            console.error(`Error getting details for job ${job.id}:`, error);
+                            return job;
+                        }
+                    })
+                );
+                
+                setPrintJobs(jobsWithDetails);
             }
-
-            // Update the local state
-            setPrintJobs(prev => prev.map(j => {
-                if (j.id === job.id) {
-                    return {
-                        ...j,
-                        isPaused: !j.isPaused
-                    };
-                }
-                return j;
-            }));
         } catch (error) {
-            console.error(`Failed to ${job.isPaused ? 'resume' : 'pause'} print:`, error);
-            addNotification(`Failed to ${job.isPaused ? 'resume' : 'pause'} ${job.fileName}: ${error.message}`);
+            console.error('Error fetching print jobs:', error);
+            setError('Unable to load your print jobs. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Initialize on component mount
+    useEffect(() => {
+        fetchUserPrintJobs();
+        
+        // Set up polling interval
+        const interval = setInterval(() => {
+            fetchUserPrintJobs();
+        }, POLLING_INTERVAL);
+        
+        return () => clearInterval(interval);
+    }, [fetchUserPrintJobs]);
+
+    // Refresh specific job
+    const handleRefreshJob = async (jobId) => {
+        // Show refresh indicator
+        setRefreshTimers(prev => ({
+            ...prev,
+            [jobId]: true
+        }));
+        
+        try {
+            const statusData = await getJobStatus(jobId);
+            
+            // Update this specific job
+            setPrintJobs(prev => prev.map(job => 
+                job.id === jobId ? { 
+                    ...job, 
+                    jobInfo: statusData.data,
+                    status: statusData.data?.status || job.status
+                } : job
+            ));
+            
+            addNotification(`Refreshed status for print job`);
+        } catch (error) {
+            console.error('Error refreshing job:', error);
+        } finally {
+            // Clear refresh indicator after 1 second
+            setTimeout(() => {
+                setRefreshTimers(prev => ({
+                    ...prev,
+                    [jobId]: false
+                }));
+            }, 1000);
         }
     };
 
-    // Add notification to queue
+    // Pause a print job
+    const handlePauseJob = async (jobId) => {
+        try {
+            await pausePrintJob(jobId);
+            
+            // Update job in state
+            setPrintJobs(prev => prev.map(job => 
+                job.id === jobId ? { ...job, isPaused: true, state: 'paused' } : job
+            ));
+            
+            addNotification('Print job paused successfully');
+            
+            // Refresh job after a brief delay to get updated status
+            setTimeout(() => handleRefreshJob(jobId), 1000);
+        } catch (error) {
+            console.error('Error pausing job:', error);
+            setError('Failed to pause print job. Please try again.');
+        }
+    };
+
+    // Resume a print job
+    const handleResumeJob = async (jobId) => {
+        try {
+            await resumePrintJob(jobId);
+            
+            // Update job in state
+            setPrintJobs(prev => prev.map(job => 
+                job.id === jobId ? { ...job, isPaused: false, state: 'printing' } : job
+            ));
+            
+            addNotification('Print job resumed successfully');
+            
+            // Refresh job after a brief delay to get updated status
+            setTimeout(() => handleRefreshJob(jobId), 1000);
+        } catch (error) {
+            console.error('Error resuming job:', error);
+            setError('Failed to resume print job. Please try again.');
+        }
+    };
+
+    // Cancel a print job
+    const handleCancelJob = async (jobId) => {
+        if (window.confirm('Are you sure you want to cancel this print job? This action cannot be undone.')) {
+            try {
+                await cancelPrintJob(jobId);
+                
+                // Update job in state
+                setPrintJobs(prev => prev.map(job => 
+                    job.id === jobId ? { ...job, state: 'cancelled' } : job
+                ));
+                
+                addNotification('Print job cancelled successfully');
+                
+                // Refresh all jobs to get latest status
+                fetchUserPrintJobs();
+            } catch (error) {
+                console.error('Error cancelling job:', error);
+                setError('Failed to cancel print job. Please try again.');
+            }
+        }
+    };
+
+    // Add notification
     const addNotification = (message) => {
         setNotifications(prev => [{
             id: Date.now(),
             message,
             timestamp: new Date()
-        }, ...prev]);
+        }, ...prev].slice(0, DISPLAY_NOTIFICATIONS));
     };
 
     // Clear notifications
@@ -238,6 +352,84 @@ const PrintingProgress = ({ selectedFiles, onReset }) => {
         if (minutes < 1) return 'Less than a minute';
         return `${Math.round(minutes)} minutes`;
     };
+          
+    // Get color based on job state
+    const getStateColor = (state) => {
+        switch (state) {
+            case 'printing':
+                return 'info';
+            case 'completed':
+                return 'success';
+            case 'paused':
+                return 'warning';
+            case 'cancelled':
+            case 'error':
+                return 'error';
+            default:
+                return 'default';
+        }
+    };
+
+    // Format time HH:MM
+    const formatTimeHoursMinutes = (seconds) => {
+        if (!seconds || seconds <= 0) return 'Unknown';
+        
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else {
+            return `${minutes}m`;
+        }
+    };
+
+    // Format filename for display
+    const formatFileName = (filePath) => {
+        if (!filePath) return 'Unknown';
+        
+        // Extract just the filename from the path
+        const fileName = filePath.split(/[\\\/]/).pop();
+        
+        // If it's a group file, extract material and color info
+        if (fileName.includes('group_')) {
+            const parts = fileName.replace('.stl', '').split('_');
+            if (parts.length >= 3) {
+                const material = parts[1].toUpperCase();
+                const color = parts[2].charAt(0).toUpperCase() + parts[2].slice(1);
+                return `${color} ${material} Print`;
+            }
+        }
+        
+        return fileName;
+    };
+    
+    // Get estimated completion time
+    const getEstimatedCompletion = (job) => {
+        if (!job.jobInfo || !job.jobInfo.progress || job.jobInfo.progress.completion === null) {
+            return 'Calculating...';
+        }
+        
+        const completion = job.jobInfo.progress.completion;
+        const printTimeLeft = job.jobInfo.progress.printTimeLeft || 0;
+        
+        if (completion >= 100) {
+            return 'Complete';
+        }
+        
+        if (printTimeLeft === 0) {
+            return 'Calculating...';
+        }
+        
+        // Calculate estimated completion time
+        const now = new Date();
+        const completionTime = new Date(now.getTime() + printTimeLeft * 1000);
+        return completionTime.toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+    };
+
 
     return (
         <ThemeProvider theme={theme}>
@@ -561,6 +753,7 @@ const PrintingProgress = ({ selectedFiles, onReset }) => {
                                             {notification.message}
                                         </Typography>
                                         <Typography variant="caption" sx={{ ml: 2, color: '#aaaaaa', fontWeight: 300 }}>
+
                                             {notification.timestamp.toLocaleTimeString()}
                                         </Typography>
                                     </Alert>
@@ -571,7 +764,8 @@ const PrintingProgress = ({ selectedFiles, onReset }) => {
                 )}
             </Box>
         </ThemeProvider>
+
     );
 };
 
-export default PrintingProgress;
+export default PrintMonitor;
