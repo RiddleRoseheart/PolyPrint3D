@@ -334,9 +334,27 @@ def send_to_printer(request_id: str):
         success = slicer_service.send_to_printer(request_id, current_user)
         
         if success:
-            return ResponseBuilder.success(message="Print job sent to printer successfully")
+            # Check final state to determine the message
+            refreshed_request = slicer_service.get_print_request(request_id, current_user)
+            
+            if refreshed_request.state == "printing":
+                return ResponseBuilder.success(message="Print job started successfully")
+            elif refreshed_request.state == "queued":
+                # Get queue position
+                from backend.services.printer_queue_service import PrinterQueueService
+                queue_service = PrinterQueueService()
+                queue = queue_service.get_printer_queue(refreshed_request.printer_id)
+                position = next((i+1 for i, req in enumerate(queue) if req.id == request_id), 0)
+                
+                return ResponseBuilder.success({
+                    "message": "Print job added to queue",
+                    "state": "queued",
+                    "queue_position": position
+                })
+            else:
+                return ResponseBuilder.success(message="Print request processed successfully")
         else:
-            return ResponseBuilder.error("Failed to send print job to printer. Check server logs for details.", 400)
+            return ResponseBuilder.error("Failed to send print job to printer", 400)
             
     except Exception as e:
         logger.error(f"Error sending print job to printer: {str(e)}")
