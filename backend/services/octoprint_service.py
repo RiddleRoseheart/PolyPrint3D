@@ -292,3 +292,36 @@ class OctoPrintService:
                 
             except Exception as e:
                 logger.error(f"Error checking completed prints: {str(e)}")
+                
+        
+    def resume_print_job(self, printer: Printer) -> bool:
+        """
+        Resume the paused print job
+        
+        Args:
+            printer: Printer model object
+            
+        Returns:
+            bool indicating success
+        """
+        try:
+            url = f"http://{printer.ip_address}/api/job"
+            headers = self._get_headers(printer.api_key)
+            
+            data = {
+                "command": "pause",
+                "action": "resume"
+            }
+            
+            response = requests.post(url, headers=headers, json=data)
+            
+            if response.status_code in (200, 204):
+                self.logger.info(f"Successfully resumed print job on printer {printer.name}")
+                return True
+            else:
+                self.logger.error(f"Failed to resume print job: {response.status_code} - {response.text}")
+                return False
+                    
+        except Exception as e:
+            self.logger.error(f"Error resuming print job: {str(e)}")
+            return False
