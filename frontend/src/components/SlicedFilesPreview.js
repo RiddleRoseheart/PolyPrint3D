@@ -941,7 +941,25 @@ const handlePrintStart = async (selectedRequestIds) => {
                                 Print Requests
                             </Typography>
                             
-                            <Stack spacing={2} sx={{ maxHeight: 400, overflowY: 'auto', pr: 1 }}>
+                            <Stack spacing={2} sx={{ 
+                                height: '100%',    // Changed from maxHeight to height
+                                maxHeight: 400, 
+                                overflowY: 'auto', 
+                                pr: 1,
+                                '&::-webkit-scrollbar': {
+                                    width: '8px',
+                                },
+                                '&::-webkit-scrollbar-track': {
+                                    background: '#111',
+                                },
+                                '&::-webkit-scrollbar-thumb': {
+                                    background: '#444',
+                                    borderRadius: '4px',
+                                },
+                                '&::-webkit-scrollbar-thumb:hover': {
+                                    background: '#555',
+                                },
+                            }}>
                                 {slicingResult?.print_requests?.map((request) => (
                                     <Card 
                                         key={request.id}
@@ -954,7 +972,11 @@ const handlePrintStart = async (selectedRequestIds) => {
                                             transition: 'all 0.2s ease',
                                             '&:hover': {
                                                 borderColor: '#555555'
-                                            }
+                                            },
+                                            display: 'flex',          // Added flex display
+                                            flexDirection: 'column',  // Stack content vertically
+                                            minHeight: 0,             // Allow card to shrink
+                                            flexShrink: 0             // Prevent excessive shrinking
                                         }}
                                     >
                                         <CardContent 
@@ -962,7 +984,8 @@ const handlePrintStart = async (selectedRequestIds) => {
                                             sx={{
                                                 p: 2,
                                                 '&:last-child': { pb: 2 },
-                                                color: '#ffffff'
+                                                color: '#ffffff',
+                                                flexGrow: 1            // Allow content to grow
                                             }}
                                         >
                                             <Typography 
@@ -985,13 +1008,24 @@ const handlePrintStart = async (selectedRequestIds) => {
                                             </Typography> 
                                         </CardContent>
 
-                                        <CardActions sx={{ p: 1.5, borderTop: '1px solid #222222' }}>
+                                        <CardActions sx={{ 
+                                            p: 1.5, 
+                                            borderTop: '1px solid #222222',
+                                            display: 'flex',          // Ensure flex display
+                                            flexShrink: 0,            // Prevent actions from shrinking
+                                            flexWrap: 'wrap',         // Allow buttons to wrap if needed
+                                            gap: 1                    // Add gap between buttons when wrapped
+                                        }}>
                                             <Button 
                                                 size="small" 
-                                                onClick={() => setActivePreview(request)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();  // Stop event bubbling
+                                                    setActivePreview(request);
+                                                }}
                                                 variant={activePreview?.id === request.id ? "contained" : "outlined"}
                                                 sx={{
                                                     borderRadius: 0,
+                                                    flexGrow: 0,         // Don't let button grow
                                                     ...(activePreview?.id === request.id 
                                                         ? {
                                                             bgcolor: '#ffffff',
@@ -1018,14 +1052,14 @@ const handlePrintStart = async (selectedRequestIds) => {
                                             <Button
                                                 size="small"
                                                 onClick={(e) => {
-                                                    e.stopPropagation();
+                                                    e.stopPropagation();  // Stop event bubbling
                                                     handleDownload(request);
                                                 }}
                                                 disabled={isDownloading}
                                                 startIcon={<DownloadIcon />}
                                                 sx={{
                                                     color: '#aaaaaa',
-                                                    ml: 1,
+                                                    flexGrow: 0,         // Don't let button grow
                                                     '&:hover': {
                                                         color: '#ffffff',
                                                         backgroundColor: 'rgba(255, 255, 255, 0.05)'
