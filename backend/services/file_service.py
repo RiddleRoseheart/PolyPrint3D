@@ -235,7 +235,7 @@ class FileService:
                     'volume': float(obj.volume),
                     'face_count': len(obj.faces),
                     'material': 'PLA',
-                    'color': 'Black',
+                    'color': 'White',
                     'preview_url': f'/api/files/{file_id}/objects/{i+1}'
                 })
                 

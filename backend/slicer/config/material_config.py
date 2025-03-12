@@ -262,7 +262,8 @@ def get_available_colors(material_id=None, printer_id=None):
             "White": "#FFFFFF",
             "Red": "#FF0000",
             "Blue": "#0000FF",
-            "Green": "#00FF00"
+            "Green": "#00FF00",
+            "Clear": "#FFFFFF"
         }
 @dataclass
 class ObjectConfig:
@@ -521,7 +522,7 @@ def get_available_printers():
         
         if not printer_objects and local_mode:
             printer_objects = [
-                PrinterConfig("printer1", "Default PLA Printer", "PLA", "Black"),
+                PrinterConfig("printer1", "Default PLA Printer", "PLA", "White"),
                 PrinterConfig("printer2", "Default ABS Printer", "ABS", "Blue"),
                 PrinterConfig("printer3", "Default PETG Printer", "PETG", "Red")
             ]

@@ -162,11 +162,11 @@ def create_test_data():
             hex_code="#0000FF"
         )
         
-        black = Color(
-            id=str(uuid.uuid4()),
-            name="Black",
-            hex_code="#000000"
-        )
+        # black = Color(
+        #     id=str(uuid.uuid4()),
+        #     name="Black",
+        #     hex_code="#000000"
+        # )
         
         white = Color(
             id=str(uuid.uuid4()),
@@ -186,7 +186,7 @@ def create_test_data():
             hex_code="#FFFFFF"
         )
         
-        db.session.add_all([red, blue, black, white, green, clear])
+        db.session.add_all([red, blue, white, green, clear])
         db.session.commit()
         
         # For user1

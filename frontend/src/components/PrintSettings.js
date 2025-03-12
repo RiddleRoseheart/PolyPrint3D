@@ -32,6 +32,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SpeedIcon from '@mui/icons-material/Speed';
 import LayersIcon from '@mui/icons-material/Layers';
 import SettingsIcon from '@mui/icons-material/Settings';
+import { checkLocalMode} from '../api/endpoints/configEndpoints';
 
 const PRINT_SETTINGS = {
     QUALITY_LEVELS: [
@@ -66,6 +67,9 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {}, onReset }) => {
         quality: 'MEDIUM',
         infill: 20,
     });
+    
+    const [isLocalMode, setIsLocalMode] = useState(false);
+
 
     // Loading and error states
     const [isLoading, setIsLoading] = useState(false);
@@ -252,13 +256,13 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {}, onReset }) => {
                         setDebugInfo({ stage: 'analysis_complete', message: `Detected ${analysisResult.objects.length} objects (legacy format)` });
                     } else {
                         console.warn("Could not detect objects, using default");
-                        setObjectSettings([{ id: 1, material: 'PLA', color: 'Black' }]);
+                        setObjectSettings([{ id: 1, material: 'PLA', color: 'White' }]);
                         setDebugInfo({ stage: 'analysis_fallback', message: 'Using default object settings' });
                     }
                 } catch (analysisError) {
                     console.error("Error analyzing STL:", analysisError);
                     setError(`Failed to analyze model: ${analysisError.message}`);
-                    setObjectSettings([{ id: 1, material: 'PLA', color: 'Black' }]);
+                    setObjectSettings([{ id: 1, material: 'PLA', color: 'White' }]);
                     setDebugInfo({ stage: 'analysis_error', message: `Analysis error: ${analysisError.message}` });
                 }
                 
@@ -973,6 +977,7 @@ const PrintSettings = ({ fileData, onSlicingComplete = () => {}, onReset }) => {
                             materials={materials}
                             colors={colors}
                             setColors={setColors}
+                            isLocalMode={isLocalMode}
                         
                         />
                     )}
