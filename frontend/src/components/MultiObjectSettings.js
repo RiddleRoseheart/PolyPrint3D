@@ -17,8 +17,8 @@ import {
 import ObjectPreview from './ObjectPreview';
 import { getColors, getMaterials } from '../api/endpoints/slicerEndpoints';
 import { getAllPrinters } from '../api/endpoints/printerEndpoints';
-/**
- * Component for individual object settings card
+import { checkLocalMode} from '../api/endpoints/configEndpoints';
+/* Component for individual object settings card
  * @param {Object} props
  * @param {Object} props.object - Object data
  * @param {number} props.index - Index of the object in the list
@@ -151,7 +151,8 @@ const MultiObjectSettings = ({
     onObjectsChange, 
     materials = {}, 
     colors: globalColors = {}, 
-    setColors 
+    setColors,
+    isLocalMode = false 
 }) => {
     const [printerStatus, setPrinterStatus] = useState({});
     const [availableMaterials, setAvailableMaterials] = useState(materials);
@@ -169,12 +170,14 @@ const MultiObjectSettings = ({
                     const operationalColors = {};
 
                     response.printers.forEach(printer => {
-                        // Strict availability check
-                        const isAvailable = printer.is_available === true && 
-                                            ['online', 'operational'].includes(printer.status.toLowerCase());
+                        // In local mode, show all printers
+                        // In server mode, only show operational printers
+                        const isAvailable = isLocalMode || 
+                            (printer.is_available === true && 
+                            ['online', 'operational'].includes(printer.status.toLowerCase()));
                         
                         if (isAvailable) {
-                            // Only add materials and colors from strictly operational printers
+                            // Ensure material and color exist in our original sets
                             if (printer.material && materials[printer.material]) {
                                 operationalMaterials[printer.material] = materials[printer.material];
                             }
@@ -193,14 +196,15 @@ const MultiObjectSettings = ({
 
                     setPrinterStatus(status);
 
-                    // Set only materials and colors from operational printers
-                    const filteredMaterials = Object.keys(operationalMaterials).length 
-                        ? operationalMaterials 
-                        : {};
+  // In local mode, show all materials and colors
+                    // In server mode, only show operational ones
+                    const filteredMaterials = isLocalMode 
+                        ? materials 
+                        : (Object.keys(operationalMaterials).length ? operationalMaterials : {});
                     
-                    const filteredColors = Object.keys(operationalColors).length 
-                        ? operationalColors 
-                        : {};
+                    const filteredColors = isLocalMode 
+                        ? globalColors 
+                        : (Object.keys(operationalColors).length ? operationalColors : {});
 
                     setAvailableMaterials(filteredMaterials);
                     setAvailableColors(filteredColors);
@@ -212,11 +216,11 @@ const MultiObjectSettings = ({
                 }
             } catch (error) {
                 console.error('Error in fetchPrinterStatus:', error);
-                // Fallback to empty if no operational printers
-                setAvailableMaterials({});
-                setAvailableColors({});
+                // Fallback to all materials and colors
+                setAvailableMaterials(materials);
+                setAvailableColors(globalColors);
                 if (setColors) {
-                    setColors({});
+                    setColors(globalColors);
                 }
             }
         };
@@ -224,7 +228,7 @@ const MultiObjectSettings = ({
         fetchPrinterStatus();
         const intervalId = setInterval(fetchPrinterStatus, 30000);
         return () => clearInterval(intervalId);
-    }, [materials, globalColors]);
+    }, [materials, globalColors, isLocalMode]);
 
     // Handle material change for a specific object
     const handleMaterialChange = async (index, materialName) => {
