@@ -259,9 +259,9 @@ class OctoPrintService:
                 self.logger.error(f"Failed to resume print job: {response.status_code} - {response.text}")
                 return False
               
-    except Exception as e:
-        self.logger.error(f"Error resuming print job: {str(e)}")
-        return False
+        except Exception as e:
+            self.logger.error(f"Error resuming print job: {str(e)}")
+            return False
     
 def check_completed_prints():
     """
