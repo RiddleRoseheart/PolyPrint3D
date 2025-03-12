@@ -27,6 +27,16 @@ import PriceCheckIcon from '@mui/icons-material/PriceCheck';
 import axiosInstance from '../api/axiosConfig';
 import { sendToPrinter } from '../api/endpoints/printerEndpoints'; 
 
+import { 
+    Info as InfoIcon
+} from '@mui/icons-material';
+/**
+ * Loading overlay component for 3D preview
+ * @param {Object} props
+ * @param {React.ReactNode} props.children - Child components to render
+ * @param {boolean} props.isLoading - Whether the content is loading
+ * @returns {JSX.Element} Loading overlay wrapper component
+ */
 const PreviewContainer = ({ children, isLoading }) => (
     <Box sx={{ position: 'relative', height: '100%', width: '100%' }}>
         {children}
@@ -80,7 +90,7 @@ const isWebGLAvailable = () => {
  * @param {boolean} props.isOfflineMode - Whether the app is in offline mode
  * @returns {JSX.Element} Sliced files preview component
  */
-const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart }) => {
+const SlicedFilesPreview = ({ slicingResult, onReset, isOfflineMode = false, onPrintStart, isLocalMode }) => {
     const [selectedSlices, setSelectedSlices] = useState(new Set());
     const [selectedRequests, setSelectedRequests] = useState(new Set());
     const [activePreview, setActivePreview] = useState(null);
@@ -756,6 +766,7 @@ const handlePrintStart = async (selectedRequestIds) => {
                 // Small delay between downloads to avoid browser issues
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
+
         } catch (error) {
             console.error('Batch download error:', error);
             if (mountedRef.current) {
@@ -820,6 +831,7 @@ const handlePrintStart = async (selectedRequestIds) => {
                 <Box sx={{ p: 2 }}>
                     <Grid container spacing={2}>
                         <Grid item xs={12} md={8}>
+
                             <Box 
                                 sx={{ 
                                     position: 'relative',
@@ -910,8 +922,16 @@ const handlePrintStart = async (selectedRequestIds) => {
                                         >
                                             Reset View
                                         </Button>
+                                        <Button
+                                            size="small"
+                                            onClick={() => handleDownload(request)}
+                                            disabled={isLoading}
+                                        >
+                                            Download
+                                        </Button>
                                     </Tooltip>
                                 </Box>
+
                             )}
                         </Grid>
                         
@@ -1133,7 +1153,8 @@ const handlePrintStart = async (selectedRequestIds) => {
                         </Button>
                     </Stack>
                     
-                    {isOfflineMode ? (
+                    {/* Show download button when in local mode, otherwise show print button */}
+                    {(isLocalMode || isOfflineMode) ? (
                         <LoadingButton
                             loading={isDownloading}
                             loadingPosition="start"
@@ -1209,9 +1230,24 @@ const handlePrintStart = async (selectedRequestIds) => {
                         </LoadingButton>
                     )}
                 </Box>
+                
+                {/* Additional download options when in local mode */}
+                {isLocalMode && (
+                   <Box sx={{ mt: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                       <InfoIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 1 }} />
+                       You cannot send print jobs directly to printers
+                   </Typography>
+                   <Typography variant="body2" color="text.secondary" gutterBottom>
+                       Your computer is not on the same network as the 3D printers. You can still slice files and download the G-code to a USB drive, then load them manually onto a printer.
+                   </Typography>
+                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                       To enable direct printing, connect your device to the printer network or contact your administrator.
+                   </Typography>
+               </Box>
+                )}
             </Paper>
         </Stack>
     );
 };
-
 export default SlicedFilesPreview;
