@@ -670,10 +670,6 @@ const PrinterAdmin = () => {
               </Paper>
             </Grid>
           )}
-          {/* Alerts section */}
-          <Grid item xs={12}>
-            <AlertSection />
-          </Grid>
         </Grid>
       )}
 
