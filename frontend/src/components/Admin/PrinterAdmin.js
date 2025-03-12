@@ -20,7 +20,14 @@ import {
   Tooltip,
   LinearProgress,
   Divider,
-  Avatar
+  Avatar,
+  FormControlLabel,
+  Switch,
+  InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
@@ -43,6 +50,13 @@ import {
   cancelPrintJob 
 } from '../../api/endpoints/adminEndpoints';
 import AlertSection from './AlertSection';
+
+
+import {
+  VpnKey as VpnKeyIcon,
+  Router as RouterIcon,
+  ViewInAr as CubeIcon, 
+} from '@mui/icons-material';
 
 // Define explicit color values that will override any theme settings
 const STATUS_COLORS = {
@@ -673,84 +687,233 @@ const PrinterAdmin = () => {
         </Grid>
       )}
 
-      {/* Add/Edit Printer Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingPrinter ? 'Edit Printer' : 'Add New Printer'}
-        </DialogTitle>
-        
-        <DialogContent>
-          <Box component="form" sx={{ mt: 1 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Printer Name"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-            />
-            
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="IP Address"
-              name="ip_address"
-              value={formData.ip_address}
-              onChange={handleInputChange}
-            />
-            
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="API Key"
-              name="api_key"
-              value={formData.api_key}
-              onChange={handleInputChange}
-            />
-            
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Material"
-              name="material"
-              value={formData.material}
-              onChange={handleInputChange}
-            />
-            
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Color"
-              name="color"
-              value={formData.color}
-              onChange={handleInputChange}
-            />
-            
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Build Volume (X,Y,Z)"
-              name="build_volume"
-              value={formData.build_volume}
-              onChange={handleInputChange}
-              helperText="Format: width,depth,height in mm (e.g., 250,210,210)"
-            />
-          </Box>
-        </DialogContent>
-        
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSubmit}>
-            {editingPrinter ? 'Update' : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+    {/* Add/Edit Printer Dialog */}
+<Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+  <DialogTitle>
+    {editingPrinter ? 'Edit Printer' : 'Add New Printer'}
+  </DialogTitle>
+  
+  <DialogContent>
+    <Box component="form" sx={{ mt: 1 }}>
+      <TextField
+        margin="normal"
+        required
+        fullWidth
+        label="Printer Name"
+        name="name"
+        value={formData.name}
+        onChange={handleInputChange}
+        error={formData.name.trim() === ''}
+        helperText={formData.name.trim() === '' ? 'Printer name is required' : ''}
+      />
+      
+      <TextField
+        margin="normal"
+        required
+        fullWidth
+        label="IP Address"
+        name="ip_address"
+        value={formData.ip_address}
+        onChange={handleInputChange}
+        error={!/^(\d{1,3}\.){3}\d{1,3}$/.test(formData.ip_address)}
+        helperText={!/^(\d{1,3}\.){3}\d{1,3}$/.test(formData.ip_address) ? 'Enter a valid IP address (e.g., 192.168.1.100)' : ''}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <RouterIcon fontSize="small" />
+            </InputAdornment>
+          ),
+        }}
+      />
+      
+      <TextField
+        margin="normal"
+        required
+        fullWidth
+        label="API Key"
+        name="api_key"
+        value={formData.api_key}
+        onChange={handleInputChange}
+        error={formData.api_key.trim() === ''}
+        helperText={formData.api_key.trim() === '' ? 'API key is required' : 'The key used to authenticate with the printer'}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <VpnKeyIcon fontSize="small" />
+            </InputAdornment>
+          ),
+        }}
+      />
+      
+      <FormControl margin="normal" required fullWidth>
+        <InputLabel id="material-select-label">Material</InputLabel>
+        <Select
+          labelId="material-select-label"
+          name="material"
+          value={formData.material}
+          onChange={handleInputChange}
+          label="Material"
+          endAdornment={
+            <Tooltip title="Add custom material">
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const customMaterial = prompt('Enter custom material name:');
+                  if (customMaterial && customMaterial.trim() !== '') {
+                    setFormData({...formData, material: customMaterial.trim()});
+                  }
+                }}
+              >
+                <AddIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          }
+        >
+          <MenuItem value="PLA">PLA</MenuItem>
+          <MenuItem value="ABS">ABS</MenuItem>
+          <MenuItem value="PETG">PETG</MenuItem>
+          <MenuItem value="TPU">TPU</MenuItem>
+          <MenuItem value="Nylon">Nylon</MenuItem>
+          <MenuItem value="Resin">Resin</MenuItem>
+        </Select>
+      </FormControl>
+      
+      <FormControl margin="normal" required fullWidth>
+        <InputLabel id="color-select-label">Color</InputLabel>
+        <Select
+          labelId="color-select-label"
+          name="color"
+          value={formData.color}
+          onChange={handleInputChange}
+          label="Color"
+          renderValue={(selected) => (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box
+                sx={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  mr: 1,
+                  bgcolor: 
+                    selected === 'White' ? '#ffffff' :
+                    selected === 'Black' ? '#000000' :
+                    selected === 'Red' ? '#f44336' :
+                    selected === 'Blue' ? '#2196f3' :
+                    selected === 'Green' ? '#4caf50' :
+                    selected === 'Yellow' ? '#ffeb3b' :
+                    '#9e9e9e',
+                  border: selected === 'White' ? '1px solid #ccc' : 'none'
+                }}
+              />
+              {selected}
+            </Box>
+          )}
+          endAdornment={
+            <Tooltip title="Add custom color">
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const customColor = prompt('Enter custom color name:');
+                  if (customColor && customColor.trim() !== '') {
+                    setFormData({...formData, color: customColor.trim()});
+                  }
+                }}
+              >
+                <AddIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          }
+        >
+          <MenuItem value="White">
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ width: 20, height: 20, borderRadius: '50%', mr: 1, bgcolor: '#ffffff', border: '1px solid #ccc' }} />
+              White
+            </Box>
+          </MenuItem>
+          <MenuItem value="Black">
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ width: 20, height: 20, borderRadius: '50%', mr: 1, bgcolor: '#000000' }} />
+              Black
+            </Box>
+          </MenuItem>
+          <MenuItem value="Red">
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ width: 20, height: 20, borderRadius: '50%', mr: 1, bgcolor: '#f44336' }} />
+              Red
+            </Box>
+          </MenuItem>
+          <MenuItem value="Blue">
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ width: 20, height: 20, borderRadius: '50%', mr: 1, bgcolor: '#2196f3' }} />
+              Blue
+            </Box>
+          </MenuItem>
+          <MenuItem value="Green">
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ width: 20, height: 20, borderRadius: '50%', mr: 1, bgcolor: '#4caf50' }} />
+              Green
+            </Box>
+          </MenuItem>
+          <MenuItem value="Yellow">
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ width: 20, height: 20, borderRadius: '50%', mr: 1, bgcolor: '#ffeb3b' }} />
+              Yellow
+            </Box>
+          </MenuItem>
+        </Select>
+      </FormControl>
+      
+      <TextField
+        margin="normal"
+        required
+        fullWidth
+        label="Build Volume (X,Y,Z)"
+        name="build_volume"
+        value={formData.build_volume}
+        onChange={handleInputChange}
+        error={!/^\d+,\d+,\d+$/.test(formData.build_volume)}
+        helperText={!/^\d+,\d+,\d+$/.test(formData.build_volume) ? 'Format: width,depth,height in mm (e.g., 250,210,210)' : 'Size in mm: width × depth × height'}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <CubeIcon fontSize="small" />
+            </InputAdornment>
+          ),
+        }}
+      />
+      
+      <FormControlLabel
+        control={
+          <Switch
+            checked={formData.is_available !== false}
+            onChange={(e) => setFormData({...formData, is_available: e.target.checked})}
+            color="primary"
+          />
+        }
+        label="Available for printing"
+        sx={{ mt: 2 }}
+      />
+    </Box>
+  </DialogContent>
+  
+  <DialogActions>
+    <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+    <Button 
+      variant="contained" 
+      onClick={handleSubmit}
+      disabled={
+        formData.name.trim() === '' || 
+        !/^(\d{1,3}\.){3}\d{1,3}$/.test(formData.ip_address) ||
+        formData.api_key.trim() === '' ||
+        !/^\d+,\d+,\d+$/.test(formData.build_volume)
+      }
+    >
+      {editingPrinter ? 'Update Printer' : 'Add Printer'}
+    </Button>
+  </DialogActions>
+</Dialog>
     </Box>
   );
 };
