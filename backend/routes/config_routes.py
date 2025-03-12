@@ -11,6 +11,8 @@ def get_config_mode():
     Returns:
         JSON with isLocalMode flag
     """
+    mode = is_local_mode()
+    print(f"Mode check requested: Running in {'local' if mode else 'server'} mode")
     return jsonify({
-        'isLocalMode': is_local_mode()
+        'isLocalMode': mode
     })

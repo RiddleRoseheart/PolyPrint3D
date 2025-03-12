@@ -4,18 +4,19 @@ export async function checkLocalMode() {
   try {
     const response = await fetch(`${API_BASE_URL}/api/config/mode`, {
       method: 'GET',
-      credentials: 'include',
+      credentials: 'include'
     });
     
     if (!response.ok) {
-      // If server doesn't have this endpoint yet, assume we're in local mode
+      console.log("Local mode check failed, defaulting to local mode");
       return { isLocalMode: true };
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log("Local mode check:", result.isLocalMode ? "local" : "server");
+    return result;
   } catch (error) {
-    console.error('Error checking local mode:', error);
-    // If we can't connect to the server, assume we're in local mode
+    console.log("Error checking mode, defaulting to local mode:", error);
     return { isLocalMode: true };
   }
 }
