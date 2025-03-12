@@ -165,24 +165,26 @@ class FileManager:
             return None, str(local_path)
  
  
-    def get_job_file_paths(self, job_name, file_type, group_number):
+    def get_job_file_paths(self, job_name, file_type, group_id):
         """
         Generate both remote and local file paths.
-       
+        
         Args:
             job_name: Name of the job folder
             file_type: 'stl' or 'gcode'
-
-            group_number: Number for the group file
-           
+            group_id: Identifier for the group file
+            
         Returns:
             Tuple of (remote_path, local_path)
         """
-        remote_path = self.get_job_file_path(job_name, file_type, group_number)
-        local_path = self.local_output_path / job_name / file_type / f"group_{group_number}.{file_type}"
-       
-
-        return remote_path, str(local_path)
+        # Create the paths directly
+        local_path = self.local_output_path / job_name / file_type / f"{group_id}.{file_type}"
+        
+        if self.is_connected:
+            remote_path = f"{self.remote_path}/{job_name}/{file_type}/{group_id}.{file_type}"
+            return remote_path, str(local_path)
+        else:
+            return None, str(local_path)
    
     def mkdir_p(self, remote_directory):
         """Create remote directory and parents if they don't exist."""

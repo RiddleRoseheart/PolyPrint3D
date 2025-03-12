@@ -304,44 +304,42 @@ def download_gcode(request_id: str):
 @bp.route('/api/slicer/requests/<request_id>/print', methods=['POST'])
 @login_required
 def send_to_printer(request_id: str):
-    """
-    Send a print request to a printer
-    
-    Args:
-        request_id: ID of print request to send
-        
-    Returns:
-        JSON response indicating success or failure
-    """
+    """Send a print request to a printer"""
     try:
         # Get print request to check if it exists
         print_request = slicer_service.get_print_request(request_id, current_user)
         if not print_request:
             return ResponseBuilder.error("Print request not found or access denied", 404)
         
-        # Check if printer is assigned
-        if not print_request.printer_id:
-            return ResponseBuilder.error(f"No printer assigned to print request {request_id}", 400)
-        
-        # Check printer status before sending
-        printer = Printer.query.get(print_request.printer_id)
-        if not printer:
-            return ResponseBuilder.error(f"Printer {print_request.printer_id} not found", 404)
-        
-        logger.info(f"Sending print request {request_id} to printer {printer.name} at {printer.ip_address}")
-        
         # Send to printer
         success = slicer_service.send_to_printer(request_id, current_user)
         
         if success:
-            return ResponseBuilder.success(message="Print job sent to printer successfully")
+            # Check final state to determine the message
+            refreshed_request = slicer_service.get_print_request(request_id, current_user)
+            
+            if refreshed_request.state == "printing":
+                return ResponseBuilder.success(message="Print job started successfully")
+            elif refreshed_request.state == "queued":
+                # Get queue position
+                from backend.services.printer_queue_service import PrinterQueueService
+                queue_service = PrinterQueueService()
+                queue = queue_service.get_printer_queue(refreshed_request.printer_id)
+                position = next((i+1 for i, req in enumerate(queue) if req.id == request_id), 0)
+                
+                return ResponseBuilder.success({
+                    "message": "Print job added to queue",
+                    "state": "queued",
+                    "queue_position": position
+                })
+            else:
+                return ResponseBuilder.success(message="Print request processed successfully")
         else:
-            return ResponseBuilder.error("Failed to send print job to printer. Check server logs for details.", 400)
+            return ResponseBuilder.error("Failed to send print job to printer", 400)
             
     except Exception as e:
         logger.error(f"Error sending print job to printer: {str(e)}")
         return ResponseBuilder.error("Server error while sending print job to printer", 500)
-    
 
 @bp.route('/api/slicer/check-completed-prints', methods=['POST'])
 @login_required

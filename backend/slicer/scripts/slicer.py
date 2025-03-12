@@ -94,8 +94,27 @@ def split_disconnected_components(mesh):
     for i in range(0, len(components), batch_size):
         batch = components[i:i+batch_size]
         for comp in batch:
-            if len(comp.vertices) >= 4:
-                valid_components.append(comp)
+            # Filter out components with too few vertices
+            if len(comp.vertices) < 4:
+                continue
+                
+            # Filter out line-like objects (where one dimension is very small)
+            extents = comp.bounding_box.extents
+            min_extent = min(extents)
+            max_extent = max(extents)
+            
+            # If the smallest dimension is too small relative to the largest dimension
+            # it's probably a line or flat surface that we want to ignore
+            if min_extent < 0.01 * max_extent:  # 1% threshold
+                print(f"Filtering out line-like object with dimensions: {extents}")
+                continue
+                
+            # Calculate volume/surface area ratio - another indicator of thin objects
+            if comp.area > 0 and comp.volume/comp.area < 0.1:  # Thin objects have low volume/area ratio
+                print(f"Filtering out thin object with volume/area ratio: {comp.volume/comp.area:.4f}")
+                continue
+                
+            valid_components.append(comp)
         del batch
         gc.collect()
     
@@ -103,11 +122,26 @@ def split_disconnected_components(mesh):
 
 def check_object_fits(obj, build_volume):
     """
-    Check if an object fits within the build volume.
+    Check if an object fits within the build volume and is not a degenerate object.
     """
     x_max, y_max, z_max = build_volume
     width, depth, height = obj.bounding_box.extents
-    return (width <= x_max and depth <= y_max and height <= z_max)
+    
+    # Basic size check
+    fits_in_volume = (width <= x_max and depth <= y_max and height <= z_max)
+    
+    # Additional checks for line-like or degenerate objects
+    extents = obj.bounding_box.extents
+    min_extent = min(extents)
+    max_extent = max(extents)
+    
+    # Check if the object is not too thin/line-like
+    not_too_thin = min_extent >= 0.01 * max_extent
+    
+    # Ensure the object has a reasonable volume and isn't just a shell or line
+    has_volume = obj.volume > 0.1  # Minimum volume in mm³
+    
+    return fits_in_volume and not_too_thin and has_volume
 
 def arrange_objects_in_print_area(objects, build_volume=BUILD_VOLUME, padding=10):
     """
@@ -344,15 +378,65 @@ def split_and_distribute_objects(input_path, file_manager, job_name, build_volum
                 'printer': matching_printer,
                 'material': material,
                 'color': color, 
-                'price':total_price,
-                'weight':total_weight,
-                
-                
+                'price': total_price,
+                'weight': total_weight,
             })
         
         if unplaced:
             print(f"Warning: {len(unplaced)} objects could not be placed for {material} - {color}")
-    
+
+            batch_number = 2
+            remaining_objects = unplaced
+            
+            while remaining_objects:
+                next_scene, still_unplaced = arrange_objects_in_print_area(
+                    remaining_objects,
+                    build_volume=build_volume_tuple,
+                    padding=padding
+                )
+                
+                if next_scene.geometry:
+                    # Generate unique identifier for this batch
+                    batch_id = f"{material.lower()}_{color.lower()}_batch{batch_number}"
+                    
+                    # Get paths for this batch
+                    batch_remote_path, batch_local_path = file_manager.get_job_file_paths(job_name, 'stl', batch_id)
+                    batch_local_path = Path(batch_local_path)
+                    
+                    # Export STL
+                    next_scene.export(str(batch_local_path), file_type='stl')
+                    print(f"Exported batch {batch_number} to local file: {batch_local_path}")
+                    
+                    # Save to server
+                    with open(batch_local_path, 'rb') as f:
+                        file_manager.save_file(f.read(), batch_remote_path)
+                    
+                    # Calculate total price and weight for this batch
+                    # This is approximate as we don't track which specific objects made it into this batch
+                    objects_in_batch = len(next_scene.geometry)
+                    avg_price_per_obj = total_price / len(objects_in_group) if len(objects_in_group) > 0 else 0
+                    avg_weight_per_obj = total_weight / len(objects_in_group) if len(objects_in_group) > 0 else 0
+                    batch_price = avg_price_per_obj * objects_in_batch
+                    batch_weight = avg_weight_per_obj * objects_in_batch
+                    
+                    output_files.append({
+                        'path': str(batch_local_path),
+                        'printer': matching_printer,
+                        'material': material,
+                        'color': color,
+                        'price': batch_price,
+                        'weight': batch_weight,
+                    })
+                    
+                    batch_number += 1
+                
+                # Update remaining objects for next iteration
+                remaining_objects = still_unplaced
+                
+                # Safety check - if no objects were placed in this iteration, break to avoid infinite loop
+                if len(remaining_objects) == len(still_unplaced):
+                    print(f"Error: Could not place {len(remaining_objects)} objects despite multiple attempts")
+                    break
     return output_files
 
 def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_path):
@@ -364,12 +448,22 @@ def slice_with_prusa_slicer(stl_path, file_manager, job_name, printer, config_pa
         print(f"ERROR: PrusaSlicer executable not found at {prusa_path}")
         return False
 
-    # Generate group identifier
-    group_id = f"{printer.material.lower()}_{printer.color.lower()}"
+    # Extract the basename without duplicating "group_"
+    stl_basename = os.path.basename(stl_path)
+    stl_name_without_ext = os.path.splitext(stl_basename)[0]
     
-    # Get file paths
-    remote_path, local_path = file_manager.get_job_file_paths(job_name, 'gcode', group_id)
-    local_path = Path(local_path)
+    # Remove any existing "group_" prefix for the group_id
+    if stl_name_without_ext.startswith("group_"):
+        group_id = stl_name_without_ext[6:]  # Skip the "group_" prefix
+    else:
+        group_id = stl_name_without_ext
+
+    # Get both paths to see what we're working with
+    remote_path, remote_local_path = file_manager.get_job_file_path(job_name, 'gcode', group_id)
+    _, direct_local_path = file_manager.get_job_file_paths(job_name, 'gcode', group_id)
+    
+    # Use the correct path to ensure we can find it later
+    local_path = Path(direct_local_path)
     
     # Ensure output directory exists with full permissions
     local_path.parent.mkdir(parents=True, exist_ok=True)

@@ -2,6 +2,7 @@ import requests
 import logging
 import os
 from typing import Dict, Optional
+from datetime import datetime
 from pathlib import Path
 from backend.database.models import Printer, PrintRequest
 from backend.services.alert_service import AlertService, AlertType
@@ -230,12 +231,13 @@ class OctoPrintService:
             self.logger.error(f"Error pausing print job: {str(e)}")
             return False
 
-    def check_completed_prints(self): 
+    def check_completed_prints():
         """
         Check for completed print jobs and send notifications
         This should be called periodically by a scheduler
         """
         from backend.main import app, db
+        from backend.services.printer_queue_service import PrinterQueueService
 
         with app.app_context():  # Needed for database operations in scheduled tasks
             try:
@@ -246,8 +248,10 @@ class OctoPrintService:
                     logger.info('No active print jobs to check')
                     return
                 
+                # Initialize services
                 from backend.services.octoprint_service import OctoPrintService
                 octoprint_service = OctoPrintService()
+                printer_queue_service = PrinterQueueService()
                 
                 updated_count = 0
                 for print_request in printing_requests:
@@ -273,7 +277,9 @@ class OctoPrintService:
                                 is_complete = True
                         
                         if is_complete:
+                            old_state = print_request.state
                             print_request.state = 'completed'
+                            print_request.print_completed_at = datetime.utcnow()
                             db.session.commit()
                             
                             # Send completion notification email
@@ -285,8 +291,16 @@ class OctoPrintService:
                             notification_service.send_print_completed_notification(print_request)
                             
                             updated_count += 1
+
+                            # Handle queued jobs - process this completed print and start next job if any
+                            printer_queue_service.handle_print_completion(print_request)
                     except Exception as job_e:
                         logger.error(f"Error checking job {print_request.id}: {str(job_e)}")
+
+                    # Final check to process any queues that might have new available printers
+                started_count = printer_queue_service.process_completed_prints()
+                
+                logger.info(f'Checked {len(printing_requests)} print jobs, updated {updated_count}, started {started_count} new jobs')
                 
                 logger.info(f'Checked {len(printing_requests)} print jobs, updated {updated_count}')
                 
