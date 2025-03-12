@@ -212,7 +212,7 @@ def setup_object_configurations(components, config_params):
             material = 'PLA'
             
         # Use provided color or default to first available for this material
-        color = ui_config.get('color', 'Black').title() if ui_config else 'Black'
+        color = ui_config.get('color', 'White').title() if ui_config else 'White'
         
         # Verify color is available for this material
         available_material_colors = {
@@ -222,7 +222,7 @@ def setup_object_configurations(components, config_params):
         
         if color not in available_material_colors:
             print(f"Warning: Color {color} not available for {material}. Using first available color.")
-            color = next(iter(available_material_colors)) if available_material_colors else 'Black'
+            color = next(iter(available_material_colors)) if available_material_colors else 'White'
         
         # Calculate price based on volume and material
         price, weight = calculate_price(comp.volume, material)

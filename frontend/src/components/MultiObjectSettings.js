@@ -159,76 +159,7 @@ const MultiObjectSettings = ({
     const [availableColors, setAvailableColors] = useState(globalColors);
 
     // Fetch printer status
-    useEffect(() => {
-        const fetchPrinterStatus = async () => {
-            try {
-                const response = await getAllPrinters();
-                
-                if (response && response.printers) {
-                    const status = {};
-                    const operationalMaterials = {};
-                    const operationalColors = {};
-
-                    response.printers.forEach(printer => {
-                        // In local mode, show all printers
-                        // In server mode, only show operational printers
-                        const isAvailable = isLocalMode || 
-                            (printer.is_available === true && 
-                            ['online', 'operational'].includes(printer.status.toLowerCase()));
-                        
-                        if (isAvailable) {
-                            // Ensure material and color exist in our original sets
-                            if (printer.material && materials[printer.material]) {
-                                operationalMaterials[printer.material] = materials[printer.material];
-                            }
-                            
-                            if (printer.color && globalColors[printer.color]) {
-                                operationalColors[printer.color] = globalColors[printer.color];
-                            }
-                        }
-
-                        status[printer.id] = {
-                            isAvailable,
-                            material: printer.material,
-                            color: printer.color
-                        };
-                    });
-
-                    setPrinterStatus(status);
-
-  // In local mode, show all materials and colors
-                    // In server mode, only show operational ones
-                    const filteredMaterials = isLocalMode 
-                        ? materials 
-                        : (Object.keys(operationalMaterials).length ? operationalMaterials : {});
-                    
-                    const filteredColors = isLocalMode 
-                        ? globalColors 
-                        : (Object.keys(operationalColors).length ? operationalColors : {});
-
-                    setAvailableMaterials(filteredMaterials);
-                    setAvailableColors(filteredColors);
-
-                    // If setting colors for the parent component is provided
-                    if (setColors) {
-                        setColors(filteredColors);
-                    }
-                }
-            } catch (error) {
-                console.error('Error in fetchPrinterStatus:', error);
-                // Fallback to all materials and colors
-                setAvailableMaterials(materials);
-                setAvailableColors(globalColors);
-                if (setColors) {
-                    setColors(globalColors);
-                }
-            }
-        };
-        
-        fetchPrinterStatus();
-        const intervalId = setInterval(fetchPrinterStatus, 30000);
-        return () => clearInterval(intervalId);
-    }, [materials, globalColors, isLocalMode]);
+    
 
     // Handle material change for a specific object
     const handleMaterialChange = async (index, materialName) => {
