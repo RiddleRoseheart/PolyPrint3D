@@ -78,7 +78,7 @@ def get_user_printers_for_monitoring():
         logger.error(f"Error getting printers: {str(e)}")
         return ResponseBuilder.error(str(e), 500)
     
-    
+
 @bp.route('/api/printers/user', methods=['GET'])
 @login_required
 def get_user_printers():
@@ -666,18 +666,26 @@ def get_printer_job_info(printer):
         return None
     
     
-@bp.route('/api/admin/printers/<printer_id>/pause', methods=['POST'])
+@bp.route('/api/printers/<printer_id>/pause', methods=['POST'])
 @login_required
-def pause_printer_print(printer_id):
-    """Pause the current print job on a printer"""
-    if current_user.role != UserRole.ADMIN.value:
-        return ResponseBuilder.error("Admin access required", 403)
-        
+def pause_printer_print_user(printer_id):
+    """Pause a print job - accessible to both regular users and admins"""
     try:
         printer = Printer.query.get(printer_id)
         if not printer:
             return ResponseBuilder.error("Printer not found", 404)
             
+        # For regular users, check if they have an active print on this printer
+        if current_user.role != UserRole.ADMIN.value:
+            active_request = PrintRequest.query.filter_by(
+                printer_id=printer.id,
+                user_id=current_user.id,
+                state="printing"
+            ).first()
+            
+            if not active_request:
+                return ResponseBuilder.error("You don't have an active print on this printer", 403)
+        
         # Initialize OctoPrint service
         from backend.services.octoprint_service import OctoPrintService
         octoprint_service = OctoPrintService()
@@ -693,19 +701,27 @@ def pause_printer_print(printer_id):
     except Exception as e:
         logger.error(f"Error pausing print: {str(e)}")
         return ResponseBuilder.error(str(e), 500)
-        
-@bp.route('/api/admin/printers/<printer_id>/resume', methods=['POST'])
+
+@bp.route('/api/printers/<printer_id>/resume', methods=['POST'])
 @login_required
-def resume_printer_print(printer_id):
-    """Resume the paused print job on a printer"""
-    if current_user.role != UserRole.ADMIN.value:
-        return ResponseBuilder.error("Admin access required", 403)
-        
+def resume_printer_print_user(printer_id):
+    """Resume a print job - accessible to both regular users and admins"""
     try:
         printer = Printer.query.get(printer_id)
         if not printer:
             return ResponseBuilder.error("Printer not found", 404)
             
+        # For regular users, check if they have an active print on this printer
+        if current_user.role != UserRole.ADMIN.value:
+            active_request = PrintRequest.query.filter_by(
+                printer_id=printer.id,
+                user_id=current_user.id,
+                state="printing"
+            ).first()
+            
+            if not active_request:
+                return ResponseBuilder.error("You don't have an active print on this printer", 403)
+        
         # Initialize OctoPrint service
         from backend.services.octoprint_service import OctoPrintService
         octoprint_service = OctoPrintService()
@@ -721,19 +737,27 @@ def resume_printer_print(printer_id):
     except Exception as e:
         logger.error(f"Error resuming print: {str(e)}")
         return ResponseBuilder.error(str(e), 500)
-        
-@bp.route('/api/admin/printers/<printer_id>/cancel', methods=['POST'])
+
+@bp.route('/api/printers/<printer_id>/cancel', methods=['POST'])
 @login_required
-def cancel_printer_print(printer_id):
-    """Cancel the current print job on a printer"""
-    if current_user.role != UserRole.ADMIN.value:
-        return ResponseBuilder.error("Admin access required", 403)
-        
+def cancel_printer_print_user(printer_id):
+    """Cancel a print job - accessible to both regular users and admins"""
     try:
         printer = Printer.query.get(printer_id)
         if not printer:
             return ResponseBuilder.error("Printer not found", 404)
             
+        # For regular users, check if they have an active print on this printer
+        if current_user.role != UserRole.ADMIN.value:
+            active_request = PrintRequest.query.filter_by(
+                printer_id=printer.id,
+                user_id=current_user.id,
+                state="printing"
+            ).first()
+            
+            if not active_request:
+                return ResponseBuilder.error("You don't have an active print on this printer", 403)
+        
         # Initialize OctoPrint service
         from backend.services.octoprint_service import OctoPrintService
         octoprint_service = OctoPrintService()
@@ -748,6 +772,10 @@ def cancel_printer_print(printer_id):
                 state="printing"
             ).all()
             
+            # For regular users, only cancel their own prints
+            if current_user.role != UserRole.ADMIN.value:
+                active_requests = [req for req in active_requests if req.user_id == current_user.id]
+            
             for request in active_requests:
                 request.state = "cancelled"
                 
@@ -761,4 +789,3 @@ def cancel_printer_print(printer_id):
         db.session.rollback()
         logger.error(f"Error cancelling print: {str(e)}")
         return ResponseBuilder.error(str(e), 500)
-    

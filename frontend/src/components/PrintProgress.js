@@ -179,7 +179,8 @@ const PrintProgress = ({ selectedFiles, onReset }) => {
         }
         
         try {
-            await axiosInstance.post(`/api/admin/printers/${printer.id}/pause`);
+            // Use the non-admin endpoint
+            await axiosInstance.post(`/api/printers/${printer.id}/pause`);
             
             // Update local state immediately for UI feedback
             setPrinters(current => 
@@ -197,7 +198,7 @@ const PrintProgress = ({ selectedFiles, onReset }) => {
             setError('Failed to pause print');
         }
     };
-
+    
     const handleResume = async (jobId) => {
         const printer = getPrinterForJob(jobId);
         if (!printer) {
@@ -206,7 +207,8 @@ const PrintProgress = ({ selectedFiles, onReset }) => {
         }
         
         try {
-            await axiosInstance.post(`/api/admin/printers/${printer.id}/resume`);
+            // Use the non-admin endpoint
+            await axiosInstance.post(`/api/printers/${printer.id}/resume`);
             
             // Update local state immediately for UI feedback
             setPrinters(current => 
@@ -224,7 +226,7 @@ const PrintProgress = ({ selectedFiles, onReset }) => {
             setError('Failed to resume print');
         }
     };
-
+    
     const handleCancel = async (jobId) => {
         const printer = getPrinterForJob(jobId);
         if (!printer) {
@@ -234,7 +236,8 @@ const PrintProgress = ({ selectedFiles, onReset }) => {
         
         if (window.confirm('Are you sure you want to cancel this print?')) {
             try {
-                await axiosInstance.post(`/api/admin/printers/${printer.id}/cancel`);
+                // Use the non-admin endpoint
+                await axiosInstance.post(`/api/printers/${printer.id}/cancel`);
                 
                 // Update local state immediately for UI feedback
                 setPrinters(current => 
