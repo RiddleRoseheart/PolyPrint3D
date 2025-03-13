@@ -5,16 +5,16 @@ import { Container, Typography, Box, TextField, Button, Switch, FormControlLabel
 // Define our custom colors that will override any theme settings
 const CUSTOM_COLORS = {
     admin: {
-        bg: 'salmon', // Purple
-        text: '#FFFFFF' // White
+        bg: 'white', // Purple
+        text: 'black' // White
     },
     user: {
         bg: '#9E9E9E', // Grey
         text: '#FFFFFF' // White
     },
     delete: {
-        bg: 'red', // Red
-        text: '#FFFFFF' // White
+        bg: 'white', // Red
+        text: 'black' // White
     },
     makeAdmin: {
          // White
@@ -308,7 +308,7 @@ const AdminInfo = () => {
                                                     }}
                                                     onClick={() => handleToggleRole(user.id, user.role)}
                                                 >
-                                                    {user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+                                                    {user.role === 'admin' ? 'Downgrade' : 'Make Admin'}
                                                 </Button>
                                                 <Button
                                                     variant="contained"
