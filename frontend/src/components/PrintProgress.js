@@ -49,7 +49,7 @@ const PrintProgress = ({ selectedFiles, onReset }) => {
             setLoading(true);
             
             // First get all printers
-            const printersResponse = await axiosInstance.get('/api/admin/printers');
+            const printersResponse = await axiosInstance.get('/api/printers/monitor');
             if (printersResponse?.data?.data?.printers) {
                 setPrinters(printersResponse.data.data.printers);
             }
@@ -77,7 +77,7 @@ const PrintProgress = ({ selectedFiles, onReset }) => {
             setRefreshing(true);
             
             // Get printer data
-            const printersResponse = await axiosInstance.get('/api/admin/printers');
+            const printersResponse = await axiosInstance.get('/api/printers/monitor');
             const newPrinters = printersResponse?.data?.data?.printers || [];
             
             // Get print request data

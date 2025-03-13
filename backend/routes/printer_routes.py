@@ -11,6 +11,138 @@ from datetime import datetime
 logger = logging.getLogger(__name__) 
 bp = Blueprint('printer', __name__)
 
+@bp.route('/api/printers/monitor', methods=['GET'])
+@login_required
+def get_user_printers_for_monitoring():
+    """Get printers for monitoring based on user role"""
+    try:
+        if current_user.role == UserRole.ADMIN.value:
+            # Admins see all printers with full details
+            printers = Printer.query.all()
+        else:
+            # Regular users only see printers they have jobs on
+            user_print_requests = PrintRequest.query.filter(
+                PrintRequest.user_id == current_user.id,
+                PrintRequest.state.in_(["printing", "queued", "pending"])
+            ).all()
+            
+            # Extract printer IDs
+            printer_ids = set(pr.printer_id for pr in user_print_requests if pr.printer_id)
+            
+            # Get those printers
+            printers = Printer.query.filter(Printer.id.in_(printer_ids)).all() if printer_ids else []
+        
+        printer_data = []
+        for printer in printers:
+            try:
+                # Try to fetch current status from OctoPrint
+                status_info = check_printer_connection(printer)
+                
+                # Get active print request for this printer
+                active_request = PrintRequest.query.filter_by(
+                    printer_id=printer.id, 
+                    state="printing"
+                ).first()
+                
+                # Add to response data
+                printer_data.append({
+                    'id': printer.id,
+                    'name': printer.name,
+                    'ip_address': printer.ip_address,
+                    'status': status_info.get('status', 'unknown'),
+                    'is_available': printer.is_available,
+                    'material': printer.material,
+                    'color': printer.color,
+                    'build_volume': printer.build_volume,
+                    'last_status_check': printer.last_status_check.isoformat() if printer.last_status_check else None,
+                    'active_print_request': {
+                        'id': active_request.id,
+                        'user_id': active_request.user_id,
+                        'user_name': active_request.user.name if active_request.user else 'Unknown',
+                        'file_path': active_request.file_path,
+                        'created_at': active_request.created_at.isoformat() if active_request.created_at else None
+                    } if active_request else None,
+                    'job_info': get_printer_job_info(printer)
+                })
+            except Exception as e:
+                logger.error(f"Error checking printer {printer.id}: {str(e)}")
+                printer_data.append({
+                    'id': printer.id,
+                    'name': printer.name,
+                    'status': 'error',
+                    'error': str(e)
+                })
+                
+        return ResponseBuilder.success({'printers': printer_data})
+    except Exception as e:
+        logger.error(f"Error getting printers: {str(e)}")
+        return ResponseBuilder.error(str(e), 500)
+    
+    
+@bp.route('/api/printers/user', methods=['GET'])
+@login_required
+def get_user_printers():
+    """Get printers associated with the current user's print jobs"""
+    try:
+        # For regular users: Get printers associated with their print requests
+        user_print_requests = PrintRequest.query.filter(
+            PrintRequest.user_id == current_user.id,
+            PrintRequest.state.in_(["printing", "queued", "pending"])
+        ).all()
+        
+        # Extract printer IDs
+        printer_ids = set(pr.printer_id for pr in user_print_requests if pr.printer_id)
+        
+        # Get those printers
+        printers = Printer.query.filter(Printer.id.in_(printer_ids)).all() if printer_ids else []
+    
+        printer_data = []
+        for printer in printers:
+            try:
+                # Try to fetch current status from OctoPrint
+                status_info = check_printer_connection(printer)
+                
+                # Get active print request for this printer
+                active_request = PrintRequest.query.filter_by(
+                    printer_id=printer.id, 
+                    state="printing"
+                ).first()
+                
+                # Add to response data
+                printer_data.append({
+                    'id': printer.id,
+                    'name': printer.name,
+                    'ip_address': printer.ip_address,
+                    'status': status_info.get('status', 'unknown'),
+                    'is_available': printer.is_available,
+                    'material': printer.material,
+                    'color': printer.color,
+                    'build_volume': printer.build_volume,
+                    'last_status_check': printer.last_status_check.isoformat() if printer.last_status_check else None,
+                    'active_print_request': {
+                        'id': active_request.id,
+                        'user_id': active_request.user_id,
+                        'user_name': active_request.user.name if active_request.user else 'Unknown',
+                        'file_path': active_request.file_path,
+                        'created_at': active_request.created_at.isoformat() if active_request.created_at else None
+                    } if active_request else None,
+                    'job_info': get_printer_job_info(printer)
+                })
+            except Exception as e:
+                logger.error(f"Error checking printer {printer.id}: {str(e)}")
+                printer_data.append({
+                    'id': printer.id,
+                    'name': printer.name,
+                    'status': 'error',
+                    'error': str(e)
+                })
+                
+        return ResponseBuilder.success({'printers': printer_data})
+    except Exception as e:
+        logger.error(f"Error getting printers: {str(e)}")
+        return ResponseBuilder.error(str(e), 500)
+    
+
 @bp.route('/api/admin/printers', methods=['GET'])
 @login_required
 def get_all_printers_admin():

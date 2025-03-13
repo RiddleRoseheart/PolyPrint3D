@@ -12,7 +12,39 @@ import { handleError } from '../../utils/errorHandler';
  */
 export const getAllPrinters = async () => {
   try {
-    const response = await axiosInstance.get('/api/printers');
+    const response = await axiosInstance.get('/api/admin/printers');
+    return response.data;
+  } catch (error) {
+    // If access denied (403), try the user endpoint instead
+    if (error.response && error.response.status === 403) {
+      return getUserPrinters();
+    }
+    handleError(error);
+  }
+};
+
+/**
+ * Get printers for monitoring based on user role
+ * @returns {Promise<Object>} List of printers (all for admin, user's printers for regular users)
+ * @throws {Error} If retrieval fails
+ */
+export const getMonitorPrinters = async () => {
+  try {
+    const response = await axiosInstance.get('/api/printers/monitor');
+    return response.data;
+  } catch (error) {
+    handleError(error);
+  }
+};
+
+/**
+ * Get printers associated with the current user's print jobs
+ * @returns {Promise<Object>} List of user's printers
+ * @throws {Error} If retrieval fails
+ */
+export const getUserPrinters = async () => {
+  try {
+    const response = await axiosInstance.get('/api/printers/user');
     return response.data;
   } catch (error) {
     handleError(error);
