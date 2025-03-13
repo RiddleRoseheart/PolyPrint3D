@@ -694,6 +694,21 @@ def pause_printer_print_user(printer_id):
         success = octoprint_service.pause_print_job(printer)
         
         if success:
+            # Create notification for admins if a regular user paused the print
+            if current_user.role != UserRole.ADMIN.value:
+                from backend.services.alert_service import AlertService, AlertType
+                alert_service = AlertService()
+                
+                # Create alert for admins
+                alert_service.create_alert(
+                    title=f"Print Paused by User",
+                    message=f"User {current_user.name} paused print on printer {printer.name}",
+                    alert_type=AlertType.INFO,
+                    user_id=None,  # None means it will be sent to admins
+                    source="Printer",
+                    source_id=printer.id
+                )
+            
             return ResponseBuilder.success({"message": "Print job paused successfully"})
         else:
             return ResponseBuilder.error("Failed to pause print job", 400)
@@ -730,6 +745,21 @@ def resume_printer_print_user(printer_id):
         success = octoprint_service.resume_print_job(printer)
         
         if success:
+            # Create notification for admins if a regular user resumed the print
+            if current_user.role != UserRole.ADMIN.value:
+                from backend.services.alert_service import AlertService, AlertType
+                alert_service = AlertService()
+                
+                # Create alert for admins
+                alert_service.create_alert(
+                    title=f"Print Resumed by User",
+                    message=f"User {current_user.name} resumed print on printer {printer.name}",
+                    alert_type=AlertType.INFO,
+                    user_id=None,  # None means it will be sent to admins
+                    source="Printer",
+                    source_id=printer.id
+                )
+            
             return ResponseBuilder.success({"message": "Print job resumed successfully"})
         else:
             return ResponseBuilder.error("Failed to resume print job", 400)
@@ -778,6 +808,23 @@ def cancel_printer_print_user(printer_id):
             
             for request in active_requests:
                 request.state = "cancelled"
+                
+            db.session.commit()
+            
+            # Create notification for admins if a regular user cancelled the print
+            if current_user.role != UserRole.ADMIN.value:
+                from backend.services.alert_service import AlertService, AlertType
+                alert_service = AlertService()
+                
+                # Create alert for admins
+                alert_service.create_alert(
+                    title=f"Print Cancelled by User",
+                    message=f"User {current_user.name} cancelled print on printer {printer.name}",
+                    alert_type=AlertType.WARNING,  # Warning for cancellations
+                    user_id=None,  # None means it will be sent to admins
+                    source="Printer",
+                    source_id=printer.id
+                )
                 
             db.session.commit()
             
